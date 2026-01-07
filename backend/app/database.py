@@ -1,14 +1,23 @@
 import secrets
 
-from supabase import create_client
+from supabase import create_client, Client
 
 from app.config import settings
 
-supabase = create_client(settings.supabase_url, settings.supabase_service_key)
+_supabase: Client | None = None
+
+
+def get_supabase() -> Client:
+    """Ленивая инициализация Supabase клиента"""
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(settings.supabase_url, settings.supabase_service_key)
+    return _supabase
 
 
 def validate_invite_code(code: str):
     """Проверить инвайт-код и вернуть данные"""
+    supabase = get_supabase()
     result = supabase.table("invite_codes").select("*").eq("code", code).execute()
 
     if not result.data:
@@ -16,7 +25,6 @@ def validate_invite_code(code: str):
 
     invite = result.data[0]
 
-    # Проверить лимит использований
     if invite["uses_remaining"] <= 0:
         return None
 
@@ -25,15 +33,14 @@ def validate_invite_code(code: str):
 
 def create_session(invite_code_id: str, user_name: str):
     """Создать сессию для пользователя"""
-    # Создать или найти пользователя
+    supabase = get_supabase()
+
     user_result = supabase.table("users").insert({
         "invite_code_id": invite_code_id,
         "name": user_name
     }).execute()
 
     user_id = user_result.data[0]["id"]
-
-    # Создать токен сессии
     token = secrets.token_urlsafe(32)
 
     supabase.table("sessions").insert({
@@ -42,12 +49,9 @@ def create_session(invite_code_id: str, user_name: str):
     }).execute()
 
     # Уменьшить счётчик использований
-    current_uses = supabase.table("invite_codes").select("uses_remaining").eq(
-        "id", invite_code_id
-    ).execute().data[0]["uses_remaining"]
-
+    current = supabase.table("invite_codes").select("uses_remaining").eq("id", invite_code_id).execute()
     supabase.table("invite_codes").update({
-        "uses_remaining": current_uses - 1
+        "uses_remaining": current.data[0]["uses_remaining"] - 1
     }).eq("id", invite_code_id).execute()
 
     return token
@@ -55,6 +59,7 @@ def create_session(invite_code_id: str, user_name: str):
 
 def validate_session(token: str):
     """Проверить токен сессии"""
+    supabase = get_supabase()
     result = supabase.table("sessions").select("*, users(*)").eq("token", token).execute()
 
     if not result.data:

@@ -26,10 +26,34 @@ app.include_router(auth.router)
 
 @app.get("/health")
 async def health():
+    """Healthcheck - не зависит от внешних сервисов"""
     return {
         "status": "ok",
         "version": "1.0.0",
         "service": "SGC Legal AI Backend"
+    }
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness check - проверяет подключение к сервисам"""
+    from app.database import get_supabase
+
+    checks = {"supabase": False}
+
+    try:
+        supabase = get_supabase()
+        # Простой запрос для проверки соединения
+        supabase.table("invite_codes").select("id").limit(1).execute()
+        checks["supabase"] = True
+    except Exception as e:
+        checks["supabase_error"] = str(e)
+
+    all_healthy = all(v for k, v in checks.items() if not k.endswith("_error"))
+
+    return {
+        "status": "ready" if all_healthy else "degraded",
+        "checks": checks
     }
 
 
