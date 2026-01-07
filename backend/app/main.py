@@ -37,14 +37,15 @@ async def health():
 @app.get("/health/ready")
 async def health_ready():
     """Readiness check - проверяет подключение к сервисам"""
-    from app.database import get_supabase
+    from app.database import get_client
 
     checks = {"supabase": False}
 
     try:
-        supabase = get_supabase()
+        client = get_client()
         # Простой запрос для проверки соединения
-        supabase.table("invite_codes").select("id").limit(1).execute()
+        response = client.get("/invite_codes", params={"select": "id", "limit": "1"})
+        response.raise_for_status()
         checks["supabase"] = True
     except Exception as e:
         checks["supabase_error"] = str(e)
