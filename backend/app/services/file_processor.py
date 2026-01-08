@@ -7,8 +7,6 @@ import base64
 from typing import Tuple
 import docx
 import pdfplumber
-from PIL import Image
-import pytesseract
 import requests
 from app.config import settings
 
@@ -44,6 +42,21 @@ def get_audio_mime_type(filename: str) -> str:
     return mime_types.get(ext, 'audio/mpeg')
 
 
+def get_image_mime_type(filename: str) -> str:
+    """Получить MIME тип для изображения"""
+    ext = filename.lower().split('.')[-1]
+    mime_types = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'bmp': 'image/bmp',
+        'tiff': 'image/tiff',
+        'webp': 'image/webp'
+    }
+    return mime_types.get(ext, 'image/png')
+
+
 async def process_file(file_content: bytes, filename: str) -> Tuple[str, str]:
     """
     Обработать файл и извлечь текст
@@ -58,7 +71,7 @@ async def process_file(file_content: bytes, filename: str) -> Tuple[str, str]:
     elif file_type == 'text':
         text = file_content.decode('utf-8', errors='ignore')
     elif file_type == 'image':
-        text = extract_image_ocr(file_content)
+        text = await extract_image_gemini(file_content, filename)
     elif file_type == 'audio':
         text = await transcribe_audio_gemini(file_content, filename)
     else:
@@ -116,19 +129,52 @@ def extract_pdf(content: bytes) -> str:
         os.unlink(tmp_path)
 
 
-def extract_image_ocr(content: bytes) -> str:
-    """Извлечь текст из изображения через OCR"""
-    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
+async def extract_image_gemini(content: bytes, filename: str) -> str:
+    """
+    Извлечь текст из изображения через Gemini (OpenRouter)
+    Gemini поддерживает изображения как multimodal input
+    """
+    # Кодируем изображение в base64
+    image_base64 = base64.b64encode(content).decode('utf-8')
+    mime_type = get_image_mime_type(filename)
 
-    try:
-        image = Image.open(tmp_path)
-        # Используем русский + английский языки
-        text = pytesseract.image_to_string(image, lang='rus+eng')
-        return text.strip()
-    finally:
-        os.unlink(tmp_path)
+    # Формируем запрос к Gemini через OpenRouter
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {settings.openrouter_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
+            "X-Title": "SGC Legal AI"
+        },
+        json={
+            "model": "google/gemini-2.5-flash-preview",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Распознай и извлеки весь текст с этого изображения. Выведи только распознанный текст, сохраняя структуру и форматирование. Если текста нет, напиши 'Текст не обнаружен'."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 4096
+        },
+        timeout=120
+    )
+
+    response.raise_for_status()
+    result = response.json()
+
+    return result["choices"][0]["message"]["content"]
 
 
 async def transcribe_audio_gemini(content: bytes, filename: str) -> str:
