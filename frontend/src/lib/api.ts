@@ -297,3 +297,103 @@ export async function getSupportedFormats(): Promise<SupportedFormats> {
   const res = await fetch(`${API_URL}/api/files/supported`);
   return res.json();
 }
+
+// Admin API functions
+
+export interface InviteCode {
+  id: string;
+  code: string;
+  name: string;
+  uses_remaining: number;
+  created_at: string;
+}
+
+export async function adminLogin(password: string): Promise<{ token: string }> {
+  const res = await fetch(`${API_URL}/api/admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Ошибка авторизации");
+  }
+
+  return res.json();
+}
+
+export async function adminLogout(token: string): Promise<void> {
+  await fetch(`${API_URL}/api/admin/logout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getInviteCodes(token: string): Promise<InviteCode[]> {
+  const res = await fetch(`${API_URL}/api/admin/invite-codes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось получить инвайт-коды");
+  }
+
+  return res.json();
+}
+
+export async function createInviteCode(
+  token: string,
+  name: string,
+  uses: number,
+  code?: string
+): Promise<InviteCode> {
+  const res = await fetch(`${API_URL}/api/admin/invite-codes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name, uses, code }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Не удалось создать инвайт-код");
+  }
+
+  return res.json();
+}
+
+export async function deleteInviteCode(
+  token: string,
+  codeId: string
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/invite-codes/${codeId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось удалить инвайт-код");
+  }
+}
+
+export async function updateInviteCodeUses(
+  token: string,
+  codeId: string,
+  uses: number
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/invite-codes/${codeId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ uses }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось обновить инвайт-код");
+  }
+}
