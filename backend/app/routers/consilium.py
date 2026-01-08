@@ -66,51 +66,61 @@ async def run_consilium_stream(
 
     async def generate():
         stage_updates = asyncio.Queue()
-        error_holder = {"error": None}
+        task_done = asyncio.Event()
+        task_result = {"result": None, "error": None}
 
         async def on_stage_update(stage: str, message: str):
             await stage_updates.put({"stage": stage, "message": message})
 
-        async def run_with_error_handling():
+        async def run_task():
             try:
-                return await run_consilium(request.question, on_stage_update)
+                result = await run_consilium(request.question, on_stage_update)
+                task_result["result"] = result
             except Exception as e:
-                error_holder["error"] = str(e)
-                await stage_updates.put({"stage": "error", "message": str(e)})
-                raise
+                task_result["error"] = str(e)
+            finally:
+                task_done.set()
+                # Signal end of stages
+                await stage_updates.put(None)
 
         # Отправляем начальное сообщение
         yield f"data: {json.dumps({'stage': 'starting', 'message': 'Запуск консилиума...'}, ensure_ascii=False)}\n\n"
 
         # Запускаем консилиум в фоне
-        task = asyncio.create_task(run_with_error_handling())
+        asyncio.create_task(run_task())
 
-        # Отправляем обновления стадий (5 стадий + возможная ошибка)
-        stages_complete = 0
-        while stages_complete < 5:
+        # Читаем обновления стадий до завершения задачи
+        while True:
             try:
-                # Увеличен таймаут до 180 секунд для стадии 1 (3 LLM вызова)
                 update = await asyncio.wait_for(stage_updates.get(), timeout=180)
-                yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
 
-                if update.get("stage") == "error":
+                if update is None:
+                    # Task finished
                     break
 
-                stages_complete += 1
+                yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
+
             except asyncio.TimeoutError:
-                yield f"data: {json.dumps({'stage': 'timeout', 'message': 'Превышено время ожидания стадии'})}\n\n"
-                task.cancel()
+                yield f"data: {json.dumps({'stage': 'timeout', 'message': 'Превышено время ожидания (180s)'})}\n\n"
                 break
 
-        # Ждём финальный результат
-        if not task.cancelled() and error_holder["error"] is None:
+        # Ждём завершения задачи (должна уже быть завершена)
+        try:
+            await asyncio.wait_for(task_done.wait(), timeout=10)
+        except asyncio.TimeoutError:
+            pass
+
+        # Отправляем результат или ошибку
+        if task_result["error"]:
+            yield f"data: {json.dumps({'stage': 'error', 'message': task_result['error']})}\n\n"
+        elif task_result["result"]:
             try:
-                result = await asyncio.wait_for(task, timeout=60)
-                yield f"data: {json.dumps({'stage': 'complete', 'result': result}, ensure_ascii=False)}\n\n"
-            except asyncio.TimeoutError:
-                yield f"data: {json.dumps({'stage': 'error', 'message': 'Таймаут финализации'})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'stage': 'error', 'message': str(e)})}\n\n"
+                result_json = json.dumps({'stage': 'complete', 'result': task_result['result']}, ensure_ascii=False)
+                yield f"data: {result_json}\n\n"
+            except (TypeError, ValueError) as e:
+                yield f"data: {json.dumps({'stage': 'error', 'message': f'JSON error: {str(e)}'})}\n\n"
+        else:
+            yield f"data: {json.dumps({'stage': 'error', 'message': 'Неизвестная ошибка'})}\n\n"
 
         yield "data: [DONE]\n\n"
 
