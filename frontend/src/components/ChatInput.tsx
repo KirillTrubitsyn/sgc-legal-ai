@@ -1,14 +1,28 @@
 "use client";
 
-import { useState, KeyboardEvent } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 
 interface Props {
   onSend: (message: string) => void;
   disabled?: boolean;
+  placeholder?: string;
+  initialValue?: string;
 }
 
-export default function ChatInput({ onSend, disabled }: Props) {
-  const [input, setInput] = useState("");
+export default function ChatInput({
+  onSend,
+  disabled,
+  placeholder = "Введите ваш вопрос...",
+  initialValue = ""
+}: Props) {
+  const [input, setInput] = useState(initialValue);
+
+  // Обновить input когда initialValue меняется
+  useEffect(() => {
+    if (initialValue && initialValue !== input) {
+      setInput(initialValue);
+    }
+  }, [initialValue]);
 
   const handleSend = () => {
     if (input.trim() && !disabled) {
@@ -30,9 +44,9 @@ export default function ChatInput({ onSend, disabled }: Props) {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Введите ваш вопрос..."
+        placeholder={placeholder}
         disabled={disabled}
-        rows={1}
+        rows={Math.min(5, Math.max(1, input.split('\n').length))}
         className="flex-1 px-4 py-3 bg-sgc-blue-700 border border-sgc-blue-500 rounded-xl
                    text-white placeholder-gray-400 focus:outline-none focus:border-sgc-orange-500
                    resize-none disabled:opacity-50"

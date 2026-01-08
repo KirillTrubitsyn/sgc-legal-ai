@@ -247,3 +247,53 @@ export async function runConsilium(
   if (finalResult) return finalResult;
   throw new Error("Stream ended without result");
 }
+
+// File upload types and functions
+
+export interface FileUploadResult {
+  success: boolean;
+  file_type: string;
+  extracted_text: string;
+  summary: string;
+  error?: string;
+}
+
+export async function uploadFile(
+  token: string,
+  file: File
+): Promise<FileUploadResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/files/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Ошибка загрузки файла");
+  }
+
+  return res.json();
+}
+
+export interface SupportedFormats {
+  formats: {
+    documents: { extensions: string[]; description: string };
+    images: { extensions: string[]; description: string };
+    audio: { extensions: string[]; description: string };
+  };
+  limits: {
+    max_file_size_mb: number;
+    max_audio_duration_sec: number;
+  };
+}
+
+export async function getSupportedFormats(): Promise<SupportedFormats> {
+  const res = await fetch(`${API_URL}/api/files/supported`);
+  return res.json();
+}

@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     llm_expert_2: str = "google/gemini-3-pro-preview"
     llm_verification: str = "perplexity/sonar-pro"
 
+    # File upload
+    max_file_size: int = 25 * 1024 * 1024  # 25 MB
+    max_audio_duration: int = 300  # 5 minutes in seconds
+
     # App
     environment: str = "production"
     allowed_origins: str = "http://localhost:3000"
