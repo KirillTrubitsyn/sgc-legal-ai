@@ -109,7 +109,7 @@ export default function ChatPage() {
       }
     } else {
       // Consilium mode
-      setConsiliumStage("");
+      setConsiliumStage("starting");
       setConsiliumMessage("Запуск консилиума...");
 
       try {
@@ -117,6 +117,15 @@ export default function ChatPage() {
           token,
           content,
           (update: StageUpdate) => {
+            // Handle error/timeout stages
+            if (update.stage === "error" || update.stage === "timeout") {
+              setConsiliumStage("");
+              setMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: `Ошибка: ${update.message}` },
+              ]);
+              return;
+            }
             setConsiliumStage(update.stage);
             setConsiliumMessage(update.message || "");
           }
@@ -126,6 +135,7 @@ export default function ChatPage() {
         setConsiliumStage("");
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setConsiliumStage("");
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: `Ошибка консилиума: ${errorMessage}` },

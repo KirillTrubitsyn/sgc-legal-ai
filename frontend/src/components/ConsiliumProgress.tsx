@@ -14,7 +14,10 @@ const STAGES = [
 ];
 
 export default function ConsiliumProgress({ currentStage, message }: Props) {
-  const currentIndex = STAGES.findIndex((s) => s.id === currentStage);
+  // Handle "starting" stage as before stage_1
+  const currentIndex = currentStage === "starting"
+    ? -1
+    : STAGES.findIndex((s) => s.id === currentStage);
 
   return (
     <div className="bg-sgc-blue-700 rounded-xl p-6 mb-4">
