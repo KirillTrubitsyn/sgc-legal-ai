@@ -10,6 +10,7 @@ import {
   Message,
   ConsiliumResult,
   StageUpdate,
+  FileUploadResult,
 } from "@/lib/api";
 import ModelSelector from "@/components/ModelSelector";
 import ModeSelector from "@/components/ModeSelector";
@@ -17,6 +18,8 @@ import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import ConsiliumProgress from "@/components/ConsiliumProgress";
 import ConsiliumResultComponent from "@/components/ConsiliumResult";
+import FileUpload from "@/components/FileUpload";
+import FilePreview from "@/components/FilePreview";
 
 type Mode = "single" | "consilium";
 
@@ -38,6 +41,8 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState("");
   const [consiliumStage, setConsiliumStage] = useState("");
   const [consiliumMessage, setConsiliumMessage] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
+  const [pendingText, setPendingText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -71,12 +76,31 @@ export default function ChatPage() {
     router.push("/");
   };
 
+  const handleFileProcessed = (result: FileUploadResult) => {
+    setUploadedFile(result);
+  };
+
+  const handleUseFileText = () => {
+    if (uploadedFile) {
+      setPendingText(uploadedFile.extracted_text);
+      setUploadedFile(null);
+    }
+  };
+
   const handleSend = async (content: string) => {
     if (isLoading) return;
+
+    // Если есть загруженный файл, добавляем текст к сообщению
+    let fullContent = content;
+    if (uploadedFile) {
+      fullContent = `[Загружен файл: ${uploadedFile.summary}]\n\nСодержимое файла:\n${uploadedFile.extracted_text}\n\nВопрос пользователя:\n${content}`;
+      setUploadedFile(null);
+    }
 
     const userMessage: Message = { role: "user", content };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    setPendingText("");
 
     if (mode === "single") {
       // Single Query mode
@@ -84,20 +108,20 @@ export default function ChatPage() {
       setStreamingContent("");
 
       try {
-        let fullContent = "";
+        let fullResponse = "";
         const allMessages = [
           ...messages.filter((m): m is Message => "role" in m),
-          userMessage,
+          { role: "user" as const, content: fullContent },
         ];
 
         await sendQuery(token, selectedModel, allMessages, (chunk) => {
-          fullContent += chunk;
-          setStreamingContent(fullContent);
+          fullResponse += chunk;
+          setStreamingContent(fullResponse);
         });
 
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: fullContent },
+          { role: "assistant", content: fullResponse },
         ]);
         setStreamingContent("");
       } catch (err: unknown) {
@@ -115,7 +139,7 @@ export default function ChatPage() {
       try {
         const result = await runConsilium(
           token,
-          content,
+          fullContent,
           (update: StageUpdate) => {
             // Handle error/timeout stages
             if (update.stage === "error" || update.stage === "timeout") {
@@ -150,6 +174,8 @@ export default function ChatPage() {
     setMessages([]);
     setStreamingContent("");
     setConsiliumStage("");
+    setUploadedFile(null);
+    setPendingText("");
   };
 
   const isConsiliumMessage = (item: ChatItem): item is ConsiliumMessage => {
@@ -207,7 +233,7 @@ export default function ChatPage() {
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto">
-          {messages.length === 0 && !streamingContent && !consiliumStage ? (
+          {messages.length === 0 && !streamingContent && !consiliumStage && !uploadedFile ? (
             <div className="text-center text-gray-500 mt-20">
               <p className="text-lg mb-2">
                 {mode === "single"
@@ -219,14 +245,26 @@ export default function ChatPage() {
                   ? "Single Query — быстрые ответы от одной AI-модели"
                   : "4 модели проанализируют вопрос с верификацией судебной практики"}
               </p>
+              <p className="text-xs text-gray-600 mt-4">
+                Поддержка файлов: DOCX, PDF, TXT, изображения (OCR), аудио (транскрибация)
+              </p>
               {mode === "consilium" && (
-                <p className="text-xs text-gray-600 mt-2">
+                <p className="text-xs text-gray-600 mt-1">
                   ~$0.60 за запрос | 10-20 секунд
                 </p>
               )}
             </div>
           ) : (
             <>
+              {/* Uploaded file preview */}
+              {uploadedFile && (
+                <FilePreview
+                  file={uploadedFile}
+                  onRemove={() => setUploadedFile(null)}
+                  onUseText={handleUseFileText}
+                />
+              )}
+
               {messages.map((item, idx) =>
                 isConsiliumMessage(item) ? (
                   <div key={idx} className="mb-4">
@@ -260,10 +298,30 @@ export default function ChatPage() {
       {/* Input Area */}
       <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <ChatInput
-            onSend={handleSend}
-            disabled={isLoading || (mode === "single" && !selectedModel)}
-          />
+          <div className="flex gap-3 items-end">
+            <FileUpload
+              token={token}
+              onFileProcessed={handleFileProcessed}
+              disabled={isLoading}
+            />
+            <div className="flex-1">
+              <ChatInput
+                onSend={handleSend}
+                disabled={isLoading || (mode === "single" && !selectedModel)}
+                initialValue={pendingText}
+                placeholder={
+                  uploadedFile
+                    ? "Задайте вопрос по загруженному файлу..."
+                    : "Введите ваш вопрос..."
+                }
+              />
+            </div>
+          </div>
+          {uploadedFile && (
+            <div className="mt-2 text-xs text-gray-400">
+              Файл загружен и будет включён в запрос
+            </div>
+          )}
         </div>
       </div>
     </div>
