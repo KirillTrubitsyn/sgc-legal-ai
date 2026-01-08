@@ -10,28 +10,22 @@ def get_available_models():
     """Return list of available models"""
     return [
         {
-            "id": "anthropic/claude-sonnet-4",
-            "name": "Claude Sonnet 4",
-            "description": "Быстрая и умная модель Anthropic",
-            "price_per_1k": 0.003
+            "id": "anthropic/claude-opus-4-5",
+            "name": "Claude Opus 4.5",
+            "description": "Флагманская модель Anthropic с расширенными возможностями",
+            "price_per_1k": 0.015
         },
         {
-            "id": "openai/gpt-4o",
-            "name": "GPT-4o",
-            "description": "Флагманская модель OpenAI",
-            "price_per_1k": 0.005
+            "id": "openai/gpt-5.2",
+            "name": "ChatGPT 5.2",
+            "description": "Новейшая флагманская модель OpenAI",
+            "price_per_1k": 0.01
         },
         {
-            "id": "google/gemini-2.0-flash-001",
-            "name": "Gemini 2.0 Flash",
-            "description": "Быстрая модель Google",
-            "price_per_1k": 0.001
-        },
-        {
-            "id": "perplexity/sonar-pro",
-            "name": "Perplexity Sonar Pro",
-            "description": "Модель с поиском в интернете",
-            "price_per_1k": 0.003
+            "id": "google/gemini-3.0-pro-preview",
+            "name": "Gemini 3.0 Pro Preview",
+            "description": "Превью флагманской модели Google",
+            "price_per_1k": 0.008
         }
     ]
 
