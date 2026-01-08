@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSavedResponses, deleteSavedResponse, SavedResponse } from "@/lib/api";
+import { getSavedResponses, deleteSavedResponse, SavedResponse, exportAsDocx, downloadBlob } from "@/lib/api";
 
 export default function SavedPage() {
   const [token, setToken] = useState("");
   const [responses, setResponses] = useState<SavedResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +42,19 @@ export default function SavedPage() {
       setResponses((prev) => prev.filter((r) => r.id !== id));
     } catch (e) {
       console.error("Failed to delete:", e);
+    }
+  };
+
+  const handleDownload = async (response: SavedResponse) => {
+    setDownloadingId(response.id);
+    try {
+      const blob = await exportAsDocx(token, response.question, response.answer, response.model);
+      const timestamp = new Date(response.created_at).toISOString().slice(0, 10);
+      downloadBlob(blob, `sgc-legal-${timestamp}.docx`);
+    } catch (e) {
+      console.error("Failed to download:", e);
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -118,7 +132,14 @@ export default function SavedPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="px-4 py-3 border-t border-sgc-blue-500 flex justify-end">
+                  <div className="px-4 py-3 border-t border-sgc-blue-500 flex justify-end gap-4">
+                    <button
+                      onClick={() => handleDownload(response)}
+                      disabled={downloadingId === response.id}
+                      className="text-gray-400 hover:text-white text-sm"
+                    >
+                      {downloadingId === response.id ? "..." : "Скачать .docx"}
+                    </button>
                     <button
                       onClick={() => handleDelete(response.id)}
                       className="text-red-400 hover:text-red-300 text-sm"
