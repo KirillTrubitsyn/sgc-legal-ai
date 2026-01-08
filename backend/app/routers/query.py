@@ -1,12 +1,13 @@
 """
 Query router for Single Query mode
 """
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import json
 
+from app.services.file_processor import transcribe_audio_gemini
 from app.database import (
     validate_session,
     save_chat_message,
@@ -203,3 +204,24 @@ async def delete_saved_endpoint(
         raise HTTPException(status_code=500, detail="Failed to delete response")
 
     return {"success": True}
+
+
+@router.post("/transcribe")
+async def transcribe_voice(
+    audio: UploadFile = File(...),
+    authorization: str = Header(None)
+):
+    """Transcribe voice audio to text using Gemini"""
+    get_session_from_token(authorization)
+
+    # Read audio content
+    content = await audio.read()
+
+    # Get filename or use default
+    filename = audio.filename or "voice.webm"
+
+    try:
+        text = await transcribe_audio_gemini(content, filename)
+        return {"success": True, "text": text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка транскрипции: {str(e)}")
