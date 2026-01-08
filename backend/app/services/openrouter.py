@@ -10,7 +10,7 @@ def get_available_models():
     """Return list of available models"""
     return [
         {
-            "id": "anthropic/claude-opus-4-5",
+            "id": "anthropic/claude-opus-4.5",
             "name": "Claude Opus 4.5",
             "description": "Флагманская модель Anthropic с расширенными возможностями",
             "price_per_1k": 0.015
