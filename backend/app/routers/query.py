@@ -2,9 +2,10 @@
 Query router for Single Query mode
 """
 from fastapi import APIRouter, HTTPException, Header
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
 import json
 
 from app.database import (
@@ -21,6 +22,7 @@ from app.services.openrouter import (
     chat_completion,
     chat_completion_stream
 )
+from app.services.docx_generator import create_response_docx
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -203,3 +205,38 @@ async def delete_saved_endpoint(
         raise HTTPException(status_code=500, detail="Failed to delete response")
 
     return {"success": True}
+
+
+# Export endpoints
+
+class ExportDocxRequest(BaseModel):
+    question: str
+    answer: str
+    model: Optional[str] = None
+
+
+@router.post("/export/docx")
+async def export_docx(
+    request: ExportDocxRequest,
+    authorization: str = Header(None)
+):
+    """Export response as DOCX file"""
+    get_session_from_token(authorization)
+
+    try:
+        docx_bytes = create_response_docx(
+            question=request.question,
+            answer=request.answer,
+            model=request.model,
+            created_at=datetime.now()
+        )
+
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": "attachment; filename=sgc-legal-response.docx"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate DOCX: {str(e)}")

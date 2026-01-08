@@ -325,6 +325,9 @@ export default function ChatPage() {
                     role={item.role}
                     content={item.content}
                     onSave={handleSaveResponse}
+                    question={item.role === "assistant" ? getPreviousUserMessage() : undefined}
+                    model={selectedModel}
+                    token={token}
                   />
                 );
               })}

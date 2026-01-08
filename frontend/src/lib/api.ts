@@ -485,3 +485,38 @@ export async function updateInviteCodeUses(
     throw new Error("Не удалось обновить инвайт-код");
   }
 }
+
+// Export functions
+
+export async function exportAsDocx(
+  token: string,
+  question: string,
+  answer: string,
+  model?: string
+): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/query/export/docx`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ question, answer, model }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось экспортировать документ");
+  }
+
+  return res.blob();
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
