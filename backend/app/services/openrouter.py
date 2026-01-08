@@ -26,6 +26,12 @@ def get_available_models():
             "name": "Gemini 3.0 Pro Preview",
             "description": "Превью флагманской модели Google",
             "price_per_1k": 0.008
+        },
+        {
+            "id": "perplexity/sonar-pro-search",
+            "name": "Perplexity Sonar Pro",
+            "description": "Модель с поиском в интернете",
+            "price_per_1k": 0.003
         }
     ]
 
