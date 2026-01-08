@@ -11,7 +11,10 @@ from app.database import (
     validate_session,
     save_chat_message,
     get_chat_history,
-    clear_chat_history
+    clear_chat_history,
+    save_response,
+    get_saved_responses,
+    delete_saved_response
 )
 from app.services.openrouter import (
     get_available_models,
@@ -148,5 +151,55 @@ async def delete_history(authorization: str = Header(None)):
     success = clear_chat_history(user_id)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to clear history")
+
+    return {"success": True}
+
+
+# Saved responses endpoints
+
+class SaveResponseRequest(BaseModel):
+    question: str
+    answer: str
+    model: Optional[str] = None
+
+
+@router.post("/saved")
+async def save_response_endpoint(
+    request: SaveResponseRequest,
+    authorization: str = Header(None)
+):
+    """Save a response to favorites"""
+    session = get_session_from_token(authorization)
+    user_id = session["user_id"]
+
+    result = save_response(user_id, request.question, request.answer, request.model)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to save response")
+
+    return {"success": True, "id": result["id"]}
+
+
+@router.get("/saved")
+async def get_saved_endpoint(authorization: str = Header(None)):
+    """Get saved responses for current user"""
+    session = get_session_from_token(authorization)
+    user_id = session["user_id"]
+
+    responses = get_saved_responses(user_id)
+    return {"responses": responses}
+
+
+@router.delete("/saved/{response_id}")
+async def delete_saved_endpoint(
+    response_id: str,
+    authorization: str = Header(None)
+):
+    """Delete a saved response"""
+    session = get_session_from_token(authorization)
+    user_id = session["user_id"]
+
+    success = delete_saved_response(response_id, user_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to delete response")
 
     return {"success": True}

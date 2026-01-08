@@ -255,3 +255,63 @@ def clear_chat_history(user_id: str) -> bool:
     except Exception as e:
         print(f"clear_chat_history error: {e}")
         return False
+
+
+# Saved responses functions
+
+def save_response(user_id: str, question: str, answer: str, model: str = None) -> Optional[Dict]:
+    """Save a response to favorites"""
+    try:
+        client = get_client()
+        data = {
+            "user_id": user_id,
+            "question": question,
+            "answer": answer
+        }
+        if model:
+            data["model"] = model
+
+        response = client.post("/saved_responses", json=data)
+        response.raise_for_status()
+        result = response.json()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"save_response error: {e}")
+        return None
+
+
+def get_saved_responses(user_id: str) -> list:
+    """Get saved responses for a user"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/saved_responses",
+            params={
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "order": "created_at.desc"
+            }
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"get_saved_responses error: {e}")
+        return []
+
+
+def delete_saved_response(response_id: str, user_id: str) -> bool:
+    """Delete a saved response"""
+    try:
+        client = get_client()
+        response = client.delete(
+            "/saved_responses",
+            params={
+                "id": f"eq.{response_id}",
+                "user_id": f"eq.{user_id}"
+            }
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"delete_saved_response error: {e}")
+        return False

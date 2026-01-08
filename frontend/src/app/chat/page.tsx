@@ -13,6 +13,7 @@ import {
   FileUploadResult,
   getChatHistory,
   clearChatHistory,
+  saveResponse,
 } from "@/lib/api";
 import ModelSelector from "@/components/ModelSelector";
 import ModeSelector from "@/components/ModeSelector";
@@ -213,6 +214,12 @@ export default function ChatPage() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            <a
+              href="/saved"
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Сохранённые
+            </a>
             <span className="text-gray-400 text-sm hidden sm:inline">
               {userName}
             </span>
@@ -285,15 +292,42 @@ export default function ChatPage() {
                 />
               )}
 
-              {messages.map((item, idx) =>
-                isConsiliumMessage(item) ? (
-                  <div key={idx} className="mb-4">
-                    <ConsiliumResultComponent result={item.result} />
-                  </div>
-                ) : (
-                  <ChatMessage key={idx} role={item.role} content={item.content} />
-                )
-              )}
+              {messages.map((item, idx) => {
+                if (isConsiliumMessage(item)) {
+                  return (
+                    <div key={idx} className="mb-4">
+                      <ConsiliumResultComponent result={item.result} />
+                    </div>
+                  );
+                }
+
+                // Find previous user message for saving
+                const getPreviousUserMessage = () => {
+                  for (let i = idx - 1; i >= 0; i--) {
+                    const prev = messages[i];
+                    if (!isConsiliumMessage(prev) && prev.role === "user") {
+                      return prev.content;
+                    }
+                  }
+                  return "";
+                };
+
+                const handleSaveResponse = item.role === "assistant"
+                  ? async () => {
+                      const question = getPreviousUserMessage();
+                      await saveResponse(token, question, item.content, selectedModel);
+                    }
+                  : undefined;
+
+                return (
+                  <ChatMessage
+                    key={idx}
+                    role={item.role}
+                    content={item.content}
+                    onSave={handleSaveResponse}
+                  />
+                );
+              })}
 
               {streamingContent && (
                 <ChatMessage
