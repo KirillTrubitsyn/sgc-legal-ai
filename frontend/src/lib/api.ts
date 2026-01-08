@@ -485,3 +485,29 @@ export async function updateInviteCodeUses(
     throw new Error("Не удалось обновить инвайт-код");
   }
 }
+
+// Voice transcription API
+
+export async function transcribeAudio(
+  token: string,
+  audioBlob: Blob
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "voice.webm");
+
+  const res = await fetch(`${API_URL}/api/query/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Ошибка транскрипции");
+  }
+
+  const data = await res.json();
+  return data.text;
+}

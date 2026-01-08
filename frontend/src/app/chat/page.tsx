@@ -363,6 +363,7 @@ export default function ChatPage() {
                 onSend={handleSend}
                 disabled={isLoading || (mode === "single" && !selectedModel)}
                 initialValue={pendingText}
+                token={token}
                 placeholder={
                   uploadedFile
                     ? "Задайте вопрос по загруженному файлу..."

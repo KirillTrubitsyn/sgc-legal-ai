@@ -1,106 +1,28 @@
 "use client";
 
 import { useState, useEffect, KeyboardEvent, useRef } from "react";
+import { transcribeAudio } from "@/lib/api";
 
 interface Props {
   onSend: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
   initialValue?: string;
-}
-
-// SpeechRecognition types
-interface ISpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
-  onerror: ((event: ISpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-}
-
-interface ISpeechRecognitionEvent {
-  resultIndex: number;
-  results: {
-    length: number;
-    [index: number]: {
-      isFinal: boolean;
-      [index: number]: { transcript: string };
-    };
-  };
-}
-
-interface ISpeechRecognitionErrorEvent {
-  error: string;
-}
-
-interface ISpeechRecognitionConstructor {
-  new (): ISpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: ISpeechRecognitionConstructor;
-    webkitSpeechRecognition?: ISpeechRecognitionConstructor;
-  }
+  token?: string;
 }
 
 export default function ChatInput({
   onSend,
   disabled,
   placeholder = "Введите ваш вопрос...",
-  initialValue = ""
+  initialValue = "",
+  token
 }: Props) {
   const [input, setInput] = useState(initialValue);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
-  const recognitionRef = useRef<ISpeechRecognition | null>(null);
-
-  // Check for speech recognition support
-  useEffect(() => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognitionAPI) {
-      setSpeechSupported(true);
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "ru-RU";
-
-      recognition.onresult = (event) => {
-        let finalTranscript = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          }
-        }
-
-        if (finalTranscript) {
-          setInput((prev) => prev + finalTranscript);
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Update input when initialValue changes
   useEffect(() => {
@@ -111,10 +33,10 @@ export default function ChatInput({
 
   const handleSend = () => {
     if (input.trim() && !disabled) {
-      // Stop listening when sending
-      if (isListening && recognitionRef.current) {
-        recognitionRef.current.stop();
-        setIsListening(false);
+      // Stop recording when sending
+      if (isRecording && mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
       }
       onSend(input.trim());
       setInput("");
@@ -128,25 +50,82 @@ export default function ChatInput({
     }
   };
 
-  const toggleListening = () => {
-    if (!speechSupported || !recognitionRef.current) {
-      alert("Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome на Android или компьютере.");
-      return;
-    }
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (e) {
-        console.error("Failed to start speech recognition:", e);
-        alert("Не удалось запустить голосовой ввод. Проверьте разрешения микрофона.");
-      }
+      // Try to use webm, fallback to mp4 for iOS
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "audio/wav";
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        if (audioChunksRef.current.length === 0) return;
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+        // Get token from localStorage if not provided
+        const authToken = token || localStorage.getItem("token");
+
+        if (!authToken) {
+          alert("Ошибка: не найден токен авторизации");
+          return;
+        }
+
+        setIsTranscribing(true);
+        try {
+          const text = await transcribeAudio(authToken, audioBlob);
+          if (text) {
+            setInput((prev) => prev + (prev ? " " : "") + text);
+          }
+        } catch (error) {
+          console.error("Transcription error:", error);
+          alert("Ошибка транскрипции: " + (error instanceof Error ? error.message : "Неизвестная ошибка"));
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      alert("Не удалось запустить запись. Разрешите доступ к микрофону.");
     }
   };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const isButtonDisabled = disabled || isTranscribing;
+  const buttonState = isRecording ? "recording" : isTranscribing ? "transcribing" : "idle";
 
   return (
     <div className="flex gap-2 sm:gap-3">
@@ -154,42 +133,77 @@ export default function ChatInput({
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={isListening ? "Говорите..." : placeholder}
+        placeholder={
+          isRecording
+            ? "Говорите..."
+            : isTranscribing
+            ? "Распознаю речь..."
+            : placeholder
+        }
         disabled={disabled}
-        rows={Math.min(5, Math.max(1, input.split('\n').length))}
+        rows={Math.min(5, Math.max(1, input.split("\n").length))}
         className={`flex-1 px-4 py-3 bg-sgc-blue-700 border rounded-xl
                    text-white placeholder-gray-400 focus:outline-none focus:border-sgc-orange-500
                    resize-none disabled:opacity-50 ${
-                     isListening ? "border-red-500" : "border-sgc-blue-500"
+                     isRecording ? "border-red-500" : "border-sgc-blue-500"
                    }`}
       />
       <button
-        onClick={toggleListening}
-        disabled={disabled}
+        onClick={toggleRecording}
+        disabled={isButtonDisabled}
         type="button"
-        className={`px-3 sm:px-4 py-3 rounded-xl font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-          isListening
+        className={`px-3 sm:px-4 py-3 rounded-xl font-semibold transition-all disabled:cursor-not-allowed ${
+          buttonState === "recording"
             ? "bg-red-500 hover:bg-red-600 animate-pulse"
-            : speechSupported
-            ? "bg-sgc-blue-600 hover:bg-sgc-blue-500"
-            : "bg-sgc-blue-700 hover:bg-sgc-blue-600 opacity-70"
+            : buttonState === "transcribing"
+            ? "bg-yellow-500 animate-pulse opacity-70"
+            : "bg-sgc-blue-600 hover:bg-sgc-blue-500"
         }`}
-        title={isListening ? "Остановить запись" : speechSupported ? "Голосовой ввод" : "Голосовой ввод (не поддерживается)"}
+        title={
+          isRecording
+            ? "Остановить запись"
+            : isTranscribing
+            ? "Распознаю речь..."
+            : "Голосовой ввод"
+        }
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="w-5 h-5 sm:w-6 sm:h-6"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-          />
-        </svg>
+        {isTranscribing ? (
+          <svg
+            className="w-5 h-5 sm:w-6 sm:h-6 animate-spin"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-5 h-5 sm:w-6 sm:h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+            />
+          </svg>
+        )}
       </button>
       <button
         onClick={handleSend}
