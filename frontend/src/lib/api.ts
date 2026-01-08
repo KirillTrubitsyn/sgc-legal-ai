@@ -179,21 +179,28 @@ export async function runConsilium(
   if (!reader) throw new Error("No response body");
 
   let finalResult: ConsiliumResult | null = null;
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const text = decoder.decode(value);
-    const lines = text.split("\n");
+    buffer += decoder.decode(value, { stream: true });
+
+    // Process complete lines from buffer
+    const lines = buffer.split("\n");
+    // Keep the last incomplete line in buffer
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
       if (line.startsWith("data: ")) {
-        const data = line.slice(6);
+        const data = line.slice(6).trim();
         if (data === "[DONE]") {
           if (finalResult) return finalResult;
           throw new Error("No result received");
         }
+
+        if (!data) continue;
 
         try {
           const parsed = JSON.parse(data) as StageUpdate;
@@ -203,7 +210,35 @@ export async function runConsilium(
             finalResult = parsed.result;
           }
         } catch (e) {
-          // Skip non-JSON lines
+          // JSON parse error - might be incomplete, skip
+          console.log("Parse error:", e, "Data:", data.substring(0, 100));
+        }
+      }
+    }
+  }
+
+  // Process any remaining data in buffer
+  if (buffer.trim()) {
+    const lines = buffer.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") {
+          if (finalResult) return finalResult;
+          throw new Error("No result received");
+        }
+
+        if (!data) continue;
+
+        try {
+          const parsed = JSON.parse(data) as StageUpdate;
+          onStageUpdate(parsed);
+
+          if (parsed.stage === "complete" && parsed.result) {
+            finalResult = parsed.result;
+          }
+        } catch (e) {
+          console.log("Final parse error:", e, "Data:", data.substring(0, 100));
         }
       }
     }
