@@ -23,6 +23,7 @@ from app.services.openrouter import (
     chat_completion_stream
 )
 from app.services.docx_generator import create_response_docx
+from app.services.web_search import web_search_stream
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -130,6 +131,66 @@ async def single_query(
                 model=request.model,
                 tokens_used=tokens
             )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+class SearchRequest(BaseModel):
+    query: str
+    context: Optional[str] = None
+    stream: bool = True
+
+
+@router.post("/search")
+async def web_search_endpoint(
+    request: SearchRequest,
+    authorization: str = Header(None)
+):
+    """Execute web search using Perplexity Sonar Pro"""
+    session = get_session_from_token(authorization)
+    user_id = session["user_id"]
+
+    # Save user search query
+    save_chat_message(user_id, "user", f"[Поиск] {request.query}", "perplexity/sonar-pro-search")
+
+    if request.stream:
+        async def generate():
+            full_response = ""
+            try:
+                for chunk in web_search_stream(request.query, request.context or ""):
+                    yield f"data: {chunk}\n\n"
+                    try:
+                        parsed = json.loads(chunk)
+                        delta = parsed.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        full_response += delta
+                    except:
+                        pass
+                yield "data: [DONE]\n\n"
+                # Save search result
+                if full_response:
+                    save_chat_message(user_id, "assistant", full_response, "perplexity/sonar-pro-search")
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+    else:
+        from app.services.web_search import web_search
+        try:
+            result = web_search(request.query, request.context or "")
+            save_chat_message(user_id, "assistant", result["content"], "perplexity/sonar-pro-search")
+            return {
+                "success": True,
+                "content": result["content"],
+                "tokens_used": result["tokens"],
+                "model": result["model"]
+            }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

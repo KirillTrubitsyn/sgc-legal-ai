@@ -6,6 +6,7 @@ import {
   getModels,
   sendQuery,
   runConsilium,
+  webSearch,
   Model,
   Message,
   ConsiliumResult,
@@ -46,6 +47,7 @@ export default function ChatPage() {
   const [consiliumMessage, setConsiliumMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
   const [pendingText, setPendingText] = useState("");
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -121,20 +123,30 @@ export default function ChatPage() {
 
     if (mode === "single") {
       // Single Query mode
-      if (!selectedModel) return;
+      if (!selectedModel && !webSearchEnabled) return;
       setStreamingContent("");
 
       try {
         let fullResponse = "";
-        const allMessages = [
-          ...messages.filter((m): m is Message => "role" in m),
-          { role: "user" as const, content: fullContent },
-        ];
 
-        await sendQuery(token, selectedModel, allMessages, (chunk) => {
-          fullResponse += chunk;
-          setStreamingContent(fullResponse);
-        });
+        if (webSearchEnabled) {
+          // Web search mode
+          await webSearch(token, fullContent, (chunk) => {
+            fullResponse += chunk;
+            setStreamingContent(fullResponse);
+          });
+        } else {
+          // Regular query mode
+          const allMessages = [
+            ...messages.filter((m): m is Message => "role" in m),
+            { role: "user" as const, content: fullContent },
+          ];
+
+          await sendQuery(token, selectedModel, allMessages, (chunk) => {
+            fullResponse += chunk;
+            setStreamingContent(fullResponse);
+          });
+        }
 
         setMessages((prev) => [
           ...prev,
@@ -241,11 +253,38 @@ export default function ChatPage() {
           <div className="flex items-center gap-4">
             <ModeSelector mode={mode} onModeChange={setMode} />
             {mode === "single" && (
-              <ModelSelector
-                models={models}
-                selected={selectedModel}
-                onSelect={setSelectedModel}
-              />
+              <>
+                <ModelSelector
+                  models={models}
+                  selected={selectedModel}
+                  onSelect={setSelectedModel}
+                  disabled={webSearchEnabled}
+                />
+                <button
+                  onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                    webSearchEnabled
+                      ? "bg-green-600 text-white"
+                      : "bg-sgc-blue-600 text-gray-300 hover:text-white"
+                  }`}
+                  title="Поиск в интернете через Perplexity"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-4 h-4"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                  <span className="hidden sm:inline">Поиск</span>
+                </button>
+              </>
             )}
           </div>
           {messages.length > 0 && (
@@ -266,12 +305,16 @@ export default function ChatPage() {
             <div className="text-center text-gray-500 mt-20">
               <p className="text-lg mb-2">
                 {mode === "single"
-                  ? "Выберите модель и задайте вопрос"
+                  ? webSearchEnabled
+                    ? "Поиск в интернете"
+                    : "Выберите модель и задайте вопрос"
                   : "Режим Consilium"}
               </p>
               <p className="text-sm">
                 {mode === "single"
-                  ? "Single Query — быстрые ответы от одной AI-модели"
+                  ? webSearchEnabled
+                    ? "Perplexity найдёт актуальную информацию в интернете"
+                    : "Single Query — быстрые ответы от одной AI-модели"
                   : "4 модели проанализируют вопрос с верификацией судебной практики"}
               </p>
               <p className="text-xs text-gray-600 mt-4">
@@ -366,11 +409,13 @@ export default function ChatPage() {
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
-                disabled={isLoading || (mode === "single" && !selectedModel)}
+                disabled={isLoading || (mode === "single" && !selectedModel && !webSearchEnabled)}
                 initialValue={pendingText}
                 placeholder={
                   uploadedFile
                     ? "Задайте вопрос по загруженному файлу..."
+                    : webSearchEnabled
+                    ? "Поиск в интернете..."
                     : "Введите ваш вопрос..."
                 }
               />
