@@ -22,7 +22,7 @@ def get_available_models():
             "price_per_1k": 0.01
         },
         {
-            "id": "google/gemini-3.0-pro-preview",
+            "id": "google/gemini-3-pro-preview",
             "name": "Gemini 3.0 Pro Preview",
             "description": "Превью флагманской модели Google",
             "price_per_1k": 0.008
