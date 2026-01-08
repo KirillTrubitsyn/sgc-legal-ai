@@ -1,1 +1,1 @@
-from . import auth, query
+from . import auth, query, consilium

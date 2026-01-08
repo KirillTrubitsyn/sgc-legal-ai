@@ -2,19 +2,42 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getModels, sendQuery, Model, Message } from "@/lib/api";
+import {
+  getModels,
+  sendQuery,
+  runConsilium,
+  Model,
+  Message,
+  ConsiliumResult,
+  StageUpdate,
+} from "@/lib/api";
 import ModelSelector from "@/components/ModelSelector";
+import ModeSelector from "@/components/ModeSelector";
 import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
+import ConsiliumProgress from "@/components/ConsiliumProgress";
+import ConsiliumResultComponent from "@/components/ConsiliumResult";
+
+type Mode = "single" | "consilium";
+
+interface ConsiliumMessage {
+  type: "consilium";
+  result: ConsiliumResult;
+}
+
+type ChatItem = Message | ConsiliumMessage;
 
 export default function ChatPage() {
   const [userName, setUserName] = useState("");
   const [token, setToken] = useState("");
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [mode, setMode] = useState<Mode>("single");
+  const [messages, setMessages] = useState<ChatItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [consiliumStage, setConsiliumStage] = useState("");
+  const [consiliumMessage, setConsiliumMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -30,20 +53,17 @@ export default function ChatPage() {
     setToken(storedToken);
     setUserName(user || "Пользователь");
 
-    // Load models
     getModels(storedToken)
       .then((m) => {
         setModels(m);
         if (m.length > 0) setSelectedModel(m[0].id);
       })
-      .catch((err) => {
-        console.error("Failed to load models:", err);
-      });
+      .catch(console.error);
   }, [router]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, consiliumStage]);
 
   const handleLogout = () => {
     localStorage.removeItem("sgc_token");
@@ -52,39 +72,78 @@ export default function ChatPage() {
   };
 
   const handleSend = async (content: string) => {
-    if (!selectedModel || isLoading) return;
+    if (isLoading) return;
 
     const userMessage: Message = { role: "user", content };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
-    setStreamingContent("");
 
-    try {
-      let fullContent = "";
-
-      await sendQuery(token, selectedModel, newMessages, (chunk) => {
-        fullContent += chunk;
-        setStreamingContent(fullContent);
-      });
-
-      setMessages([...newMessages, { role: "assistant", content: fullContent }]);
+    if (mode === "single") {
+      // Single Query mode
+      if (!selectedModel) return;
       setStreamingContent("");
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      console.error("Query error:", err);
-      setMessages([
-        ...newMessages,
-        { role: "assistant", content: `Ошибка: ${errorMessage}` },
-      ]);
-    } finally {
-      setIsLoading(false);
+
+      try {
+        let fullContent = "";
+        const allMessages = [
+          ...messages.filter((m): m is Message => "role" in m),
+          userMessage,
+        ];
+
+        await sendQuery(token, selectedModel, allMessages, (chunk) => {
+          fullContent += chunk;
+          setStreamingContent(fullContent);
+        });
+
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: fullContent },
+        ]);
+        setStreamingContent("");
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Ошибка: ${errorMessage}` },
+        ]);
+      }
+    } else {
+      // Consilium mode
+      setConsiliumStage("");
+      setConsiliumMessage("Запуск консилиума...");
+
+      try {
+        const result = await runConsilium(
+          token,
+          content,
+          (update: StageUpdate) => {
+            setConsiliumStage(update.stage);
+            setConsiliumMessage(update.message || "");
+          }
+        );
+
+        setMessages((prev) => [...prev, { type: "consilium", result }]);
+        setConsiliumStage("");
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Ошибка консилиума: ${errorMessage}` },
+        ]);
+      }
     }
+
+    setIsLoading(false);
   };
 
   const handleNewChat = () => {
     setMessages([]);
     setStreamingContent("");
+    setConsiliumStage("");
+  };
+
+  const isConsiliumMessage = (item: ChatItem): item is ConsiliumMessage => {
+    return "type" in item && item.type === "consilium";
   };
 
   return (
@@ -96,12 +155,11 @@ export default function ChatPage() {
             <h1 className="text-xl font-bold">
               <span className="text-sgc-orange-500">SGC</span> Legal AI
             </h1>
-            <span className="text-gray-500 text-sm hidden sm:inline">
-              Single Query
-            </span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-gray-400 text-sm hidden sm:inline">{userName}</span>
+            <span className="text-gray-400 text-sm hidden sm:inline">
+              {userName}
+            </span>
             <button
               onClick={handleLogout}
               className="text-gray-400 hover:text-white text-sm"
@@ -112,14 +170,19 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Model Selector */}
+      {/* Mode & Model Selector */}
       <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-6 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <ModelSelector
-            models={models}
-            selected={selectedModel}
-            onSelect={setSelectedModel}
-          />
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <ModeSelector mode={mode} onModeChange={setMode} />
+            {mode === "single" && (
+              <ModelSelector
+                models={models}
+                selected={selectedModel}
+                onSelect={setSelectedModel}
+              />
+            )}
+          </div>
           {messages.length > 0 && (
             <button
               onClick={handleNewChat}
@@ -134,21 +197,50 @@ export default function ChatPage() {
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto">
-          {messages.length === 0 && !streamingContent ? (
+          {messages.length === 0 && !streamingContent && !consiliumStage ? (
             <div className="text-center text-gray-500 mt-20">
-              <p className="text-lg mb-2">Выберите модель и задайте вопрос</p>
-              <p className="text-sm">
-                Single Query режим — быстрые ответы от одной AI-модели
+              <p className="text-lg mb-2">
+                {mode === "single"
+                  ? "Выберите модель и задайте вопрос"
+                  : "Режим Consilium"}
               </p>
+              <p className="text-sm">
+                {mode === "single"
+                  ? "Single Query — быстрые ответы от одной AI-модели"
+                  : "4 модели проанализируют вопрос с верификацией судебной практики"}
+              </p>
+              {mode === "consilium" && (
+                <p className="text-xs text-gray-600 mt-2">
+                  ~$0.60 за запрос | 10-20 секунд
+                </p>
+              )}
             </div>
           ) : (
             <>
-              {messages.map((msg, idx) => (
-                <ChatMessage key={idx} role={msg.role} content={msg.content} />
-              ))}
-              {streamingContent && (
-                <ChatMessage role="assistant" content={streamingContent + "▊"} />
+              {messages.map((item, idx) =>
+                isConsiliumMessage(item) ? (
+                  <div key={idx} className="mb-4">
+                    <ConsiliumResultComponent result={item.result} />
+                  </div>
+                ) : (
+                  <ChatMessage key={idx} role={item.role} content={item.content} />
+                )
               )}
+
+              {streamingContent && (
+                <ChatMessage
+                  role="assistant"
+                  content={streamingContent + "|"}
+                />
+              )}
+
+              {consiliumStage && (
+                <ConsiliumProgress
+                  currentStage={consiliumStage}
+                  message={consiliumMessage}
+                />
+              )}
+
               <div ref={messagesEndRef} />
             </>
           )}
@@ -158,7 +250,10 @@ export default function ChatPage() {
       {/* Input Area */}
       <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <ChatInput onSend={handleSend} disabled={isLoading || !selectedModel} />
+          <ChatInput
+            onSend={handleSend}
+            disabled={isLoading || (mode === "single" && !selectedModel)}
+          />
         </div>
       </div>
     </div>

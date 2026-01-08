@@ -96,3 +96,119 @@ export async function sendQuery(
     }
   }
 }
+
+// Consilium types and functions
+
+export interface ConsiliumResult {
+  question: string;
+  started_at: string;
+  completed_at: string;
+  stages: {
+    stage_1: Record<string, ModelOpinion>;
+    stage_2: CaseReference[];
+    stage_3: VerifiedCase[];
+    stage_4: PeerReview;
+    stage_5: { synthesis: string };
+  };
+  final_answer: string;
+  verified_cases: VerifiedCase[];
+}
+
+export interface ModelOpinion {
+  model: string;
+  name: string;
+  content: string;
+  tokens?: number;
+  error?: boolean;
+}
+
+export interface CaseReference {
+  case_number: string;
+  court: string;
+  date: string;
+  summary: string;
+  source_model: string;
+}
+
+export interface VerifiedCase extends CaseReference {
+  status: "VERIFIED" | "LIKELY_EXISTS" | "NOT_FOUND" | "NEEDS_MANUAL_CHECK";
+  verification: Record<string, unknown>;
+}
+
+export interface PeerReview {
+  reviews: Record<string, {
+    legal_accuracy: number;
+    practical_value: number;
+    source_reliability: number;
+    argumentation: number;
+    total: number;
+    strengths: string[];
+    weaknesses: string[];
+  }>;
+  ranking: string[];
+}
+
+export interface StageUpdate {
+  stage: string;
+  message?: string;
+  result?: ConsiliumResult;
+}
+
+export async function runConsilium(
+  token: string,
+  question: string,
+  onStageUpdate: (update: StageUpdate) => void
+): Promise<ConsiliumResult> {
+  const res = await fetch(`${API_URL}/api/consilium/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Consilium failed");
+  }
+
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) throw new Error("No response body");
+
+  let finalResult: ConsiliumResult | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const text = decoder.decode(value);
+    const lines = text.split("\n");
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6);
+        if (data === "[DONE]") {
+          if (finalResult) return finalResult;
+          throw new Error("No result received");
+        }
+
+        try {
+          const parsed = JSON.parse(data) as StageUpdate;
+          onStageUpdate(parsed);
+
+          if (parsed.stage === "complete" && parsed.result) {
+            finalResult = parsed.result;
+          }
+        } catch (e) {
+          // Skip non-JSON lines
+        }
+      }
+    }
+  }
+
+  if (finalResult) return finalResult;
+  throw new Error("Stream ended without result");
+}
