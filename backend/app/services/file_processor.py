@@ -148,7 +148,7 @@ async def extract_image_gemini(content: bytes, filename: str) -> str:
             "X-Title": "SGC Legal AI"
         },
         json={
-            "model": "google/gemini-2.5-flash-preview",
+            "model": "google/gemini-2.0-flash-001",
             "messages": [
                 {
                     "role": "user",
@@ -196,7 +196,7 @@ async def transcribe_audio_gemini(content: bytes, filename: str) -> str:
             "X-Title": "SGC Legal AI"
         },
         json={
-            "model": "google/gemini-2.5-flash-preview",
+            "model": "google/gemini-2.0-flash-001",
             "messages": [
                 {
                     "role": "user",
