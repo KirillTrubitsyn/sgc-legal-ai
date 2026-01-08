@@ -129,7 +129,10 @@ export default function ChatInput({
   };
 
   const toggleListening = () => {
-    if (!recognitionRef.current) return;
+    if (!speechSupported || !recognitionRef.current) {
+      alert("Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome на Android или компьютере.");
+      return;
+    }
 
     if (isListening) {
       recognitionRef.current.stop();
@@ -140,6 +143,7 @@ export default function ChatInput({
         setIsListening(true);
       } catch (e) {
         console.error("Failed to start speech recognition:", e);
+        alert("Не удалось запустить голосовой ввод. Проверьте разрешения микрофона.");
       }
     }
   };
@@ -159,34 +163,34 @@ export default function ChatInput({
                      isListening ? "border-red-500" : "border-sgc-blue-500"
                    }`}
       />
-      {speechSupported && (
-        <button
-          onClick={toggleListening}
-          disabled={disabled}
-          type="button"
-          className={`px-3 sm:px-4 py-3 rounded-xl font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-            isListening
-              ? "bg-red-500 hover:bg-red-600 animate-pulse"
-              : "bg-sgc-blue-600 hover:bg-sgc-blue-500"
-          }`}
-          title={isListening ? "Остановить запись" : "Голосовой ввод"}
+      <button
+        onClick={toggleListening}
+        disabled={disabled}
+        type="button"
+        className={`px-3 sm:px-4 py-3 rounded-xl font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+          isListening
+            ? "bg-red-500 hover:bg-red-600 animate-pulse"
+            : speechSupported
+            ? "bg-sgc-blue-600 hover:bg-sgc-blue-500"
+            : "bg-sgc-blue-700 hover:bg-sgc-blue-600 opacity-70"
+        }`}
+        title={isListening ? "Остановить запись" : speechSupported ? "Голосовой ввод" : "Голосовой ввод (не поддерживается)"}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="w-5 h-5 sm:w-6 sm:h-6"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-5 h-5 sm:w-6 sm:h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-            />
-          </svg>
-        </button>
-      )}
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+          />
+        </svg>
+      </button>
       <button
         onClick={handleSend}
         disabled={!input.trim() || disabled}
