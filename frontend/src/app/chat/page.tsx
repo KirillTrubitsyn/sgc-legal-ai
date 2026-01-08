@@ -209,9 +209,11 @@ export default function ChatPage() {
       <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-6 py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold">
-              <span className="text-sgc-orange-500">SGC</span> Legal AI
-            </h1>
+            <img
+              src="/sgc-logo-horizontal.svg"
+              alt="SGC Legal AI"
+              className="h-8"
+            />
           </div>
           <div className="flex items-center gap-4">
             <a

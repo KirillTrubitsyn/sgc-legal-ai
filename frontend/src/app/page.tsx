@@ -5,9 +5,11 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center justify-center p-8">
       {/* Logo */}
       <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold mb-2">
-          <span className="text-sgc-orange-500">SGC</span> Legal AI
-        </h1>
+        <img
+          src="/sgc-logo-main.svg"
+          alt="SGC Legal AI"
+          className="h-24 mx-auto mb-4"
+        />
         <p className="text-gray-400 text-sm">
           AI-ассистент юридической службы
         </p>

@@ -1,0 +1,35 @@
+<svg width="280" height="64" viewBox="0 0 280 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Иконка книги -->
+  <g transform="translate(4, 4)">
+    <path 
+      d="M28 6 L6 11 L6 45 L28 40 L50 45 L50 11 Z" 
+      fill="#1e3a5f"
+      stroke="#f7941d"
+      stroke-width="1.5"
+    />
+    <line x1="28" y1="6" x2="28" y2="40" stroke="#f7941d" stroke-width="1.5"/>
+    <g stroke="#f7941d" stroke-width="1">
+      <circle cx="17" cy="20" r="2.5" fill="#f7941d"/>
+      <circle cx="39" cy="20" r="2.5" fill="#f7941d"/>
+      <circle cx="17" cy="32" r="2.5" fill="#f7941d"/>
+      <circle cx="39" cy="32" r="2.5" fill="#f7941d"/>
+      <circle cx="28" cy="24" r="3" fill="#ffffff"/>
+      <line x1="17" y1="20" x2="25" y2="24"/>
+      <line x1="39" y1="20" x2="31" y2="24"/>
+      <line x1="17" y1="32" x2="25" y2="24"/>
+      <line x1="39" y1="32" x2="31" y2="24"/>
+    </g>
+  </g>
+  
+  <!-- SGC -->
+  <text x="72" y="30" fill="#f7941d" font-size="22" font-weight="700" font-family="system-ui, sans-serif">SGC</text>
+  
+  <!-- Legal AI -->
+  <text x="72" y="50" fill="#ffffff" font-size="16" font-weight="500" font-family="system-ui, sans-serif">Legal AI</text>
+  
+  <!-- Разделитель -->
+  <line x1="142" y1="16" x2="142" y2="48" stroke="#1e3a5f" stroke-width="1"/>
+  
+  <!-- Подпись -->
+  <text x="154" y="36" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Сибирская генерирующая компания</text>
+</svg>
