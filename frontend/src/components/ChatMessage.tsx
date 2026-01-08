@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { exportAsDocx, downloadBlob } from "@/lib/api";
+import MarkdownText from "./MarkdownText";
 
 interface Props {
   role: "user" | "assistant";
@@ -56,7 +57,11 @@ export default function ChatMessage({ role, content, onSave, question, model, to
             : "bg-sgc-blue-700 text-gray-100 rounded-bl-md"
         }`}
       >
-        <div className="whitespace-pre-wrap">{content}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{content}</div>
+        ) : (
+          <MarkdownText content={content} />
+        )}
         {showActions && (
           <div className="mt-2 pt-2 border-t border-gray-600/30 flex justify-end gap-2">
             {token && question && (

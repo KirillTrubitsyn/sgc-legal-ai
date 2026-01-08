@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSavedResponses, deleteSavedResponse, SavedResponse, exportAsDocx, downloadBlob } from "@/lib/api";
+import MarkdownText from "@/components/MarkdownText";
 
 export default function SavedPage() {
   const [token, setToken] = useState("");
@@ -126,8 +127,8 @@ export default function SavedPage() {
                     <span className="text-xs text-gray-400 block mb-2">
                       Ответ
                     </span>
-                    <div className="text-gray-100 whitespace-pre-wrap">
-                      {response.answer}
+                    <div className="text-gray-100">
+                      <MarkdownText content={response.answer} />
                     </div>
                   </div>
 
