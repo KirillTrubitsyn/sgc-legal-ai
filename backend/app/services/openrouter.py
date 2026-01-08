@@ -10,7 +10,7 @@ def get_available_models():
     """Return list of available models"""
     return [
         {
-            "id": "anthropic/claude-opus-4-5",
+            "id": "anthropic/claude-opus-4.5",
             "name": "Claude Opus 4.5",
             "description": "Флагманская модель Anthropic с расширенными возможностями",
             "price_per_1k": 0.015
@@ -22,10 +22,16 @@ def get_available_models():
             "price_per_1k": 0.01
         },
         {
-            "id": "google/gemini-3.0-pro-preview",
+            "id": "google/gemini-3-pro-preview",
             "name": "Gemini 3.0 Pro Preview",
             "description": "Превью флагманской модели Google",
             "price_per_1k": 0.008
+        },
+        {
+            "id": "perplexity/sonar-pro-search",
+            "name": "Perplexity Sonar Pro",
+            "description": "Модель с поиском в интернете",
+            "price_per_1k": 0.003
         }
     ]
 
