@@ -298,6 +298,94 @@ export async function getSupportedFormats(): Promise<SupportedFormats> {
   return res.json();
 }
 
+// Chat history API functions
+
+export interface ChatHistoryMessage {
+  id: string;
+  user_id: string;
+  role: "user" | "assistant";
+  content: string;
+  model?: string;
+  created_at: string;
+}
+
+export async function getChatHistory(token: string): Promise<ChatHistoryMessage[]> {
+  const res = await fetch(`${API_URL}/api/query/history`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return data.messages || [];
+}
+
+export async function clearChatHistory(token: string): Promise<void> {
+  await fetch(`${API_URL}/api/query/history`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// Saved responses API functions
+
+export interface SavedResponse {
+  id: string;
+  user_id: string;
+  question: string;
+  answer: string;
+  model?: string;
+  created_at: string;
+}
+
+export async function saveResponse(
+  token: string,
+  question: string,
+  answer: string,
+  model?: string
+): Promise<{ id: string }> {
+  const res = await fetch(`${API_URL}/api/query/saved`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ question, answer, model }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось сохранить ответ");
+  }
+
+  return res.json();
+}
+
+export async function getSavedResponses(token: string): Promise<SavedResponse[]> {
+  const res = await fetch(`${API_URL}/api/query/saved`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return data.responses || [];
+}
+
+export async function deleteSavedResponse(token: string, responseId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/query/saved/${responseId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось удалить ответ");
+  }
+}
+
 // Admin API functions
 
 export interface InviteCode {
