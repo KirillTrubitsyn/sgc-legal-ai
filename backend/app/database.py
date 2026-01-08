@@ -129,3 +129,71 @@ def validate_session(token: str) -> Optional[Dict]:
     except Exception as e:
         print(f"validate_session error: {e}")
         return None
+
+
+# Admin functions for invite codes management
+
+def get_all_invite_codes() -> list:
+    """Get all invite codes"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/invite_codes",
+            params={"select": "*", "order": "created_at.desc"}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"get_all_invite_codes error: {e}")
+        return []
+
+
+def create_invite_code(code: str, name: str, uses: int) -> Optional[Dict]:
+    """Create a new invite code"""
+    try:
+        client = get_client()
+        response = client.post(
+            "/invite_codes",
+            json={
+                "code": code,
+                "name": name,
+                "uses_remaining": uses
+            }
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data[0] if data else None
+    except Exception as e:
+        print(f"create_invite_code error: {e}")
+        return None
+
+
+def delete_invite_code(code_id: str) -> bool:
+    """Delete an invite code"""
+    try:
+        client = get_client()
+        response = client.delete(
+            "/invite_codes",
+            params={"id": f"eq.{code_id}"}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"delete_invite_code error: {e}")
+        return False
+
+
+def update_invite_code_uses(code_id: str, uses: int) -> bool:
+    """Update uses remaining for an invite code"""
+    try:
+        client = get_client()
+        response = client.patch(
+            "/invite_codes",
+            params={"id": f"eq.{code_id}"},
+            json={"uses_remaining": uses}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"update_invite_code_uses error: {e}")
+        return False

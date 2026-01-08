@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     max_file_size: int = 25 * 1024 * 1024  # 25 MB
     max_audio_duration: int = 300  # 5 minutes in seconds
 
+    # Admin
+    admin_password: str = "ADMIN2026"
+
     # App
     environment: str = "production"
     allowed_origins: str = "http://localhost:3000"
