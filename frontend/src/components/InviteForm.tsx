@@ -62,6 +62,13 @@ export default function InviteForm() {
       >
         {loading ? "Проверка..." : "Войти"}
       </button>
+
+      <a
+        href="/admin"
+        className="block mt-4 text-center text-gray-500 hover:text-gray-400 text-xs"
+      >
+        Вход для администратора
+      </a>
     </form>
   );
 }
