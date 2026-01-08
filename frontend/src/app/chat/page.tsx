@@ -11,6 +11,8 @@ import {
   ConsiliumResult,
   StageUpdate,
   FileUploadResult,
+  getChatHistory,
+  clearChatHistory,
 } from "@/lib/api";
 import ModelSelector from "@/components/ModelSelector";
 import ModeSelector from "@/components/ModeSelector";
@@ -58,10 +60,24 @@ export default function ChatPage() {
     setToken(storedToken);
     setUserName(user || "Пользователь");
 
+    // Load models
     getModels(storedToken)
       .then((m) => {
         setModels(m);
         if (m.length > 0) setSelectedModel(m[0].id);
+      })
+      .catch(console.error);
+
+    // Load chat history
+    getChatHistory(storedToken)
+      .then((history) => {
+        if (history.length > 0) {
+          const loadedMessages: Message[] = history.map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+          setMessages(loadedMessages);
+        }
       })
       .catch(console.error);
   }, [router]);
@@ -170,7 +186,11 @@ export default function ChatPage() {
     setIsLoading(false);
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
+    // Clear history in database
+    if (token) {
+      await clearChatHistory(token);
+    }
     setMessages([]);
     setStreamingContent("");
     setConsiliumStage("");

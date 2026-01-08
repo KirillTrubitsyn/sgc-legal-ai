@@ -298,6 +298,37 @@ export async function getSupportedFormats(): Promise<SupportedFormats> {
   return res.json();
 }
 
+// Chat history API functions
+
+export interface ChatHistoryMessage {
+  id: string;
+  user_id: string;
+  role: "user" | "assistant";
+  content: string;
+  model?: string;
+  created_at: string;
+}
+
+export async function getChatHistory(token: string): Promise<ChatHistoryMessage[]> {
+  const res = await fetch(`${API_URL}/api/query/history`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return data.messages || [];
+}
+
+export async function clearChatHistory(token: string): Promise<void> {
+  await fetch(`${API_URL}/api/query/history`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // Admin API functions
 
 export interface InviteCode {
