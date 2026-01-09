@@ -585,6 +585,130 @@ export async function googleSearch(
   return res.json();
 }
 
+// Court Practice Search types and functions
+
+export interface CourtPracticeCase {
+  case_number: string;
+  court: string;
+  date: string;
+  summary: string;
+  status?: "VERIFIED" | "LIKELY_EXISTS" | "NOT_FOUND" | "NEEDS_MANUAL_CHECK";
+  verification_source?: "damia_api" | "perplexity";
+  verification?: {
+    exists?: boolean;
+    confidence?: string;
+    sources?: string[];
+    links?: string[];
+    damia_data?: Record<string, unknown>;
+    actual_info?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface CourtPracticeResult {
+  query: string;
+  started_at: string;
+  completed_at?: string;
+  search_result: string;
+  cases: CourtPracticeCase[];
+  verified_cases: CourtPracticeCase[];
+  summary: string;
+}
+
+export interface CourtPracticeStageUpdate {
+  stage: string;
+  message?: string;
+  result?: CourtPracticeResult;
+}
+
+export async function searchCourtPractice(
+  token: string,
+  query: string,
+  onStageUpdate: (update: CourtPracticeStageUpdate) => void
+): Promise<CourtPracticeResult> {
+  const res = await fetch(`${API_URL}/api/query/court-practice`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ query }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Court practice search failed");
+  }
+
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) throw new Error("No response body");
+
+  let finalResult: CourtPracticeResult | null = null;
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") {
+          if (finalResult) return finalResult;
+          throw new Error("No result received");
+        }
+
+        if (!data) continue;
+
+        try {
+          const parsed = JSON.parse(data) as CourtPracticeStageUpdate;
+          onStageUpdate(parsed);
+
+          if (parsed.stage === "complete" && parsed.result) {
+            finalResult = parsed.result;
+          }
+        } catch {
+          console.log("Parse error for court practice update");
+        }
+      }
+    }
+  }
+
+  // Process remaining buffer
+  if (buffer.trim()) {
+    const lines = buffer.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6).trim();
+        if (data === "[DONE]" && finalResult) return finalResult;
+
+        if (!data) continue;
+
+        try {
+          const parsed = JSON.parse(data) as CourtPracticeStageUpdate;
+          onStageUpdate(parsed);
+
+          if (parsed.stage === "complete" && parsed.result) {
+            finalResult = parsed.result;
+          }
+        } catch {
+          // Skip
+        }
+      }
+    }
+  }
+
+  if (finalResult) return finalResult;
+  throw new Error("Stream ended without result");
+}
+
 // Web Search API functions (Perplexity)
 
 export async function webSearch(
