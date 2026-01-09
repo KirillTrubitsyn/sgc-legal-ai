@@ -179,7 +179,17 @@ def _add_footer(doc: Document, model: Optional[str], created_at: Optional[dateti
 def _extract_subject(question: str) -> str:
     """Extract subject from question for subtitle"""
     subject = question.strip()
-    subject = re.sub(r'^(как|что|какие|каковы|почему|зачем|где|когда|кто)\s+', '', subject, flags=re.IGNORECASE)
+
+    # Убираем типичные вводные фразы
+    intro_patterns = [
+        r'^(сделай|подготовь|составь|напиши|создай)\s+(аналитическую\s+)?(справку|обзор|анализ|заключение)\s+(по|о|об|на тему)\s*',
+        r'^(проанализируй|разъясни|объясни|расскажи)\s+(про|о|об)?\s*',
+        r'^(как|что|какие|каковы|почему|зачем|где|когда|кто)\s+',
+    ]
+
+    for pattern in intro_patterns:
+        subject = re.sub(pattern, '', subject, flags=re.IGNORECASE)
+
     subject = subject.rstrip('?').strip()
 
     if len(subject) > 80:
@@ -312,26 +322,33 @@ def _add_formatted_text(doc: Document, text: str):
 
 
 def _add_plain_text(paragraph, text: str):
-    """Add plain text without markdown formatting"""
-    # Remove any remaining markdown symbols
-    clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove **bold**
-    clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove *italic*
-    clean_text = re.sub(r'—', ',', clean_text)  # Replace em-dash with comma
-    clean_text = re.sub(r'–', ',', clean_text)  # Replace en-dash with comma
-
-    run = paragraph.add_run(clean_text)
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(11)
+    """Add text with markdown bold/italic formatting converted to DOCX"""
+    _add_inline_formatting(paragraph, text)
 
 
 def _add_inline_formatting(paragraph, text: str):
-    """Add text with inline markdown formatting (legacy, kept for bullet lists)"""
-    # Clean markdown from text
-    clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-    clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)
-    clean_text = re.sub(r'—', ',', clean_text)
-    clean_text = re.sub(r'–', ',', clean_text)
+    """Add text with inline markdown formatting converted to DOCX bold/italic"""
+    # Pattern to find **bold** and *italic* segments
+    pattern = r'(\*\*[^*]+\*\*|\*[^*]+\*)'
+    parts = re.split(pattern, text)
 
-    run = paragraph.add_run(clean_text)
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(11)
+    for part in parts:
+        if not part:
+            continue
+
+        if part.startswith('**') and part.endswith('**'):
+            # Bold text
+            content = part[2:-2]
+            run = paragraph.add_run(content)
+            run.bold = True
+        elif part.startswith('*') and part.endswith('*'):
+            # Italic text
+            content = part[1:-1]
+            run = paragraph.add_run(content)
+            run.italic = True
+        else:
+            # Regular text
+            run = paragraph.add_run(part)
+
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(11)
