@@ -7,6 +7,7 @@ import {
   sendQuery,
   runConsilium,
   webSearch,
+  googleSearch,
   Model,
   Message,
   ConsiliumResult,
@@ -15,6 +16,7 @@ import {
   getChatHistory,
   clearChatHistory,
   saveResponse,
+  GoogleSearchResult,
 } from "@/lib/api";
 import ModelSelector from "@/components/ModelSelector";
 import ModeSelector from "@/components/ModeSelector";
@@ -25,7 +27,7 @@ import ConsiliumResultComponent from "@/components/ConsiliumResult";
 import FileUpload from "@/components/FileUpload";
 import FilePreview from "@/components/FilePreview";
 
-type Mode = "single" | "consilium";
+type Mode = "single" | "consilium" | "google";
 
 interface ConsiliumMessage {
   type: "consilium";
@@ -48,6 +50,8 @@ export default function ChatPage() {
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
   const [pendingText, setPendingText] = useState("");
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [googleSearchType, setGoogleSearchType] = useState<"general" | "court_cases" | "legal_topic">("legal_topic");
+  const [googleSearchLoading, setGoogleSearchLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -160,6 +164,33 @@ export default function ChatPage() {
           { role: "assistant", content: `Ошибка: ${errorMessage}` },
         ]);
       }
+    } else if (mode === "google") {
+      // Google Search mode
+      setGoogleSearchLoading(true);
+
+      try {
+        const result = await googleSearch(token, fullContent, googleSearchType);
+
+        if (result.success) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: result.content },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `Ошибка поиска: ${result.error || "Неизвестная ошибка"}` },
+          ]);
+        }
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `Ошибка Google Search: ${errorMessage}` },
+        ]);
+      }
+
+      setGoogleSearchLoading(false);
     } else {
       // Consilium mode
       setConsiliumStage("starting");
@@ -286,6 +317,17 @@ export default function ChatPage() {
                 </button>
               </>
             )}
+            {mode === "google" && (
+              <select
+                value={googleSearchType}
+                onChange={(e) => setGoogleSearchType(e.target.value as "general" | "court_cases" | "legal_topic")}
+                className="bg-sgc-blue-600 text-white px-3 py-2 rounded-lg text-sm border border-sgc-blue-500 focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
+              >
+                <option value="legal_topic">Юридический поиск</option>
+                <option value="court_cases">Судебные дела</option>
+                <option value="general">Общий поиск</option>
+              </select>
+            )}
           </div>
           {messages.length > 0 && (
             <button
@@ -308,6 +350,8 @@ export default function ChatPage() {
                   ? webSearchEnabled
                     ? "Поиск в интернете"
                     : "Выберите модель и задайте вопрос"
+                  : mode === "google"
+                  ? "Google Поиск судебной практики"
                   : "Режим Consilium"}
               </p>
               <p className="text-sm">
@@ -315,6 +359,8 @@ export default function ChatPage() {
                   ? webSearchEnabled
                     ? "Perplexity найдёт актуальную информацию в интернете"
                     : "Single Query — быстрые ответы от одной AI-модели"
+                  : mode === "google"
+                  ? "Поиск судебных дел и законодательства через Google Custom Search"
                   : "4 модели проанализируют вопрос с верификацией судебной практики"}
               </p>
               <p className="text-xs text-gray-600 mt-4">
@@ -323,6 +369,11 @@ export default function ChatPage() {
               {mode === "consilium" && (
                 <p className="text-xs text-gray-600 mt-1">
                   ~$0.60 за запрос | 10-20 секунд
+                </p>
+              )}
+              {mode === "google" && (
+                <p className="text-xs text-gray-600 mt-1">
+                  Приоритет: Судакт, КАД, КонсультантПлюс, Гарант
                 </p>
               )}
             </div>
@@ -391,6 +442,13 @@ export default function ChatPage() {
                 />
               )}
 
+              {googleSearchLoading && (
+                <div className="flex items-center gap-3 p-4 bg-sgc-blue-700 rounded-lg">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sgc-orange-500"></div>
+                  <span className="text-gray-300">Поиск через Google...</span>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </>
           )}
@@ -409,11 +467,13 @@ export default function ChatPage() {
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
-                disabled={isLoading || (mode === "single" && !selectedModel && !webSearchEnabled)}
+                disabled={isLoading || googleSearchLoading || (mode === "single" && !selectedModel && !webSearchEnabled)}
                 initialValue={pendingText}
                 placeholder={
                   uploadedFile
                     ? "Задайте вопрос по загруженному файлу..."
+                    : mode === "google"
+                    ? "Поиск судебной практики..."
                     : webSearchEnabled
                     ? "Поиск в интернете..."
                     : "Введите ваш вопрос..."
