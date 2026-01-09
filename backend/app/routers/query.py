@@ -24,14 +24,25 @@ from app.services.openrouter import (
 )
 from app.services.docx_generator import create_response_docx
 from app.services.web_search import web_search_stream
-from app.services.google_search import (
-    google_search,
-    async_google_search,
-    search_legal_topic,
-    format_search_results_for_display
-)
 
 router = APIRouter(prefix="/api/query", tags=["query"])
+
+# Системный промпт для юридического ассистента SGC
+LEGAL_SYSTEM_PROMPT = """Ты - юридический AI-ассистент Сибирской генерирующей компании (СГК).
+
+При ответе на юридические вопросы:
+1. Ссылайся на конкретные статьи законов и кодексов РФ
+2. Упоминай релевантную судебную практику (номера дел, суды, даты)
+3. Давай практические рекомендации с учётом специфики энергетической отрасли
+4. Если не уверен в актуальности информации - честно укажи это
+
+Формат ссылок на судебную практику:
+- Номер дела (например, А40-12345/2023)
+- Название суда
+- Дата решения
+- Краткая суть позиции суда
+
+Отвечай на русском языке, структурированно и профессионально."""
 
 
 class Message(BaseModel):
@@ -79,18 +90,19 @@ async def single_query(
     request: QueryRequest,
     authorization: str = Header(None)
 ):
-    """Execute single query to selected model"""
+    """Execute single query to selected model with legal context"""
     session = get_session_from_token(authorization)
     user_id = session["user_id"]
 
-    # Convert messages to dict format
-    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    # Convert messages to dict format with system prompt
+    messages = [{"role": "system", "content": LEGAL_SYSTEM_PROMPT}]
+    messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
 
     # Save user message (last one in the list)
-    if messages:
-        last_user_msg = messages[-1]
-        if last_user_msg["role"] == "user":
-            save_chat_message(user_id, "user", last_user_msg["content"], request.model)
+    user_messages = [m for m in request.messages if m.role == "user"]
+    if user_messages:
+        last_user_msg = user_messages[-1]
+        save_chat_message(user_id, "user", last_user_msg.content, request.model)
 
     if request.stream:
         # Streaming response
