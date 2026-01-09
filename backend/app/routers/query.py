@@ -152,7 +152,9 @@ async def single_query(
         save_chat_message(user_id, "user", user_query, request.model)
 
     # Enrich with search results from Perplexity (async)
-    search_context = await enrich_with_search(user_query)
+    # Пропускаем обогащение если выбран сам Perplexity — он сам ищет
+    is_perplexity = "perplexity" in request.model.lower()
+    search_context = None if is_perplexity else await enrich_with_search(user_query)
 
     # Build system prompt with search enrichment
     if search_context:
