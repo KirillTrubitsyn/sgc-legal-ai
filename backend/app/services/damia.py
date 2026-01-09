@@ -104,6 +104,10 @@ def _parse_damia_response(data: Any, case_number: str) -> Dict[str, Any]:
     - Url: ссылка на дело
     - Сумма: сумма иска
     - Судья: имя судьи
+    - Истец / Заявитель: истец по делу
+    - Ответчик: ответчик по делу
+    - Предмет / Категория: предмет спора
+    - Описание / Результат: описание или результат дела
     """
     # Если ответ пустой или не содержит данных
     if not data:
@@ -126,6 +130,7 @@ def _parse_damia_response(data: Any, case_number: str) -> Dict[str, Any]:
 
         # Нормализуем для сравнения (игнорируем регистр и пробелы)
         if _normalize_case_number(reg_number) == _normalize_case_number(case_number):
+            # Парсим все доступные поля
             case_data = {
                 "reg_number": case.get("РегНомер"),
                 "court": case.get("Суд"),
@@ -135,8 +140,16 @@ def _parse_damia_response(data: Any, case_number: str) -> Dict[str, Any]:
                 "url": case.get("Url"),
                 "amount": case.get("Сумма"),
                 "judge": case.get("Судья"),
+                # Дополнительные поля для саммари
+                "plaintiff": case.get("Истец") or case.get("Заявитель"),
+                "defendant": case.get("Ответчик"),
+                "subject": case.get("Предмет") or case.get("Категория"),
+                "description": case.get("Описание") or case.get("Результат"),
                 "raw_data": case  # Сохраняем исходные данные на всякий случай
             }
+
+            # Генерируем саммари из доступных данных
+            case_data["summary"] = _generate_case_summary(case_data)
 
             logger.info(f"DaMIA: case {case_number} VERIFIED")
             return {
@@ -152,6 +165,54 @@ def _parse_damia_response(data: Any, case_number: str) -> Dict[str, Any]:
         "case_data": None,
         "error": None
     }
+
+
+def _generate_case_summary(case_data: Dict) -> str:
+    """
+    Генерирует краткое саммари судебного дела из доступных данных.
+    """
+    parts = []
+
+    # Тип дела
+    if case_data.get("case_type"):
+        parts.append(f"Тип: {case_data['case_type']}")
+
+    # Стороны дела
+    if case_data.get("plaintiff") and case_data.get("defendant"):
+        parts.append(f"{case_data['plaintiff']} vs {case_data['defendant']}")
+    elif case_data.get("plaintiff"):
+        parts.append(f"Истец: {case_data['plaintiff']}")
+    elif case_data.get("defendant"):
+        parts.append(f"Ответчик: {case_data['defendant']}")
+
+    # Предмет спора
+    if case_data.get("subject"):
+        parts.append(f"Предмет: {case_data['subject']}")
+
+    # Сумма иска
+    if case_data.get("amount"):
+        parts.append(f"Сумма: {case_data['amount']}")
+
+    # Суд и судья
+    court_info = []
+    if case_data.get("court"):
+        court_info.append(case_data["court"])
+    if case_data.get("judge"):
+        court_info.append(f"судья {case_data['judge']}")
+    if court_info:
+        parts.append(", ".join(court_info))
+
+    # Дата и статус
+    if case_data.get("date"):
+        parts.append(f"Дата: {case_data['date']}")
+    if case_data.get("status"):
+        parts.append(f"Статус: {case_data['status']}")
+
+    # Описание/результат если есть
+    if case_data.get("description"):
+        parts.append(f"Результат: {case_data['description']}")
+
+    return ". ".join(parts) if parts else "Информация о деле получена из kad.arbitr.ru"
 
 
 def _normalize_case_number(case_number: str) -> str:

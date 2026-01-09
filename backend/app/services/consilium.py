@@ -256,6 +256,7 @@ async def stage_3_verify_cases(cases: List[Dict]) -> List[Dict]:
                 **case,
                 "status": "VERIFIED",
                 "verification_source": "damia_api",
+                "summary": case_data.get("summary", ""),  # Саммари судебного решения
                 "verification": {
                     "exists": True,
                     "confidence": "high",
