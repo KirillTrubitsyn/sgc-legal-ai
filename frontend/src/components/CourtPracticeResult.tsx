@@ -53,23 +53,76 @@ export default function CourtPracticeResult({ result }: Props) {
     }
   };
 
-  // Генерация ссылки на kad.arbitr.ru по номеру дела
-  const generateKadArbitrLink = (caseNumber: string): string | null => {
+  // Генерация ссылки на судебные базы по номеру дела
+  const generateCourtLink = (caseNumber: string): { url: string; label: string; color: string } | null => {
     if (!caseNumber) return null;
 
-    // Проверяем, что это арбитражное дело (начинается с А + цифра или апелляционное)
     const normalized = caseNumber.trim();
 
-    // Паттерны арбитражных дел: А40-12345/2024, 20АП-7288/24, 13АП-12345/2023
-    const isArbitrCase = /^[АA]\d{1,2}[-–]\d+\/\d{2,4}$/i.test(normalized) ||
-                         /^\d{1,2}[АA][ПП][-–]\d+\/\d{2,4}$/i.test(normalized);
+    // 1. Арбитражные дела первой инстанции: А40-12345/2024, А56-7890/2023
+    if (/^[АA]\d{1,2}[-–]\d+\/\d{2,4}$/i.test(normalized)) {
+      return {
+        url: `https://kad.arbitr.ru/Card?number=${encodeURIComponent(normalized)}`,
+        label: "kad.arbitr.ru",
+        color: "orange"
+      };
+    }
 
-    if (isArbitrCase) {
-      // Формируем ссылку для поиска в КАД
-      return `https://kad.arbitr.ru/Card?number=${encodeURIComponent(normalized)}`;
+    // 2. Апелляционные арбитражные: 20АП-7288/24, 13АП-12345/2023
+    if (/^\d{1,2}[АA][ПП][-–]\d+\/\d{2,4}$/i.test(normalized)) {
+      return {
+        url: `https://kad.arbitr.ru/Card?number=${encodeURIComponent(normalized)}`,
+        label: "kad.arbitr.ru",
+        color: "orange"
+      };
+    }
+
+    // 3. Дела Верховного Суда РФ (экономколлегия): 301-ЭС24-609, 306-ЭС24-487
+    if (/^\d{2,3}[-–][ЭЕ][СC]\d{2}[-–]\d+$/i.test(normalized)) {
+      return {
+        url: `https://vsrf.ru/lk/practice/cases?number=${encodeURIComponent(normalized)}`,
+        label: "vsrf.ru",
+        color: "purple"
+      };
+    }
+
+    // 4. Дела ВС РФ (ПЭК - Президиум по экономическим спорам): 286-ПЭК24
+    if (/^\d{2,3}[-–]П[ЭЕ]К\d{2}$/i.test(normalized)) {
+      return {
+        url: `https://vsrf.ru/lk/practice/cases?number=${encodeURIComponent(normalized)}`,
+        label: "vsrf.ru",
+        color: "purple"
+      };
+    }
+
+    // 5. Кассационные дела СОЮ: 33-21419/2024, 88-1234/2023
+    if (/^\d{2}[-–]\d+\/\d{2,4}$/i.test(normalized)) {
+      return {
+        url: `https://sudact.ru/search/?q=${encodeURIComponent(normalized)}`,
+        label: "sudact.ru",
+        color: "teal"
+      };
     }
 
     return null;
+  };
+
+  // Получить CSS классы для цвета кнопки
+  const getLinkColorClasses = (color: string): string => {
+    switch (color) {
+      case "blue":
+        return "bg-blue-600/30 text-blue-400 hover:bg-blue-600/50 hover:text-blue-300";
+      case "orange":
+        return "bg-orange-600/30 text-orange-400 hover:bg-orange-600/50 hover:text-orange-300";
+      case "purple":
+        return "bg-purple-600/30 text-purple-400 hover:bg-purple-600/50 hover:text-purple-300";
+      case "teal":
+        return "bg-teal-600/30 text-teal-400 hover:bg-teal-600/50 hover:text-teal-300";
+      case "yellow":
+        return "bg-yellow-600/30 text-yellow-400 hover:bg-yellow-600/50 hover:text-yellow-300";
+      default:
+        return "bg-gray-600/30 text-gray-400 hover:bg-gray-600/50 hover:text-gray-300";
+    }
   };
 
   const verifiedCases = result.verified_cases.filter(c => c.status === "VERIFIED");
@@ -147,7 +200,7 @@ export default function CourtPracticeResult({ result }: Props) {
                   {/* Links - от DaMIA или сгенерированные */}
                   {(() => {
                     const damiaLinks = c.verification?.links?.filter(Boolean) || [];
-                    const generatedLink = damiaLinks.length === 0 ? generateKadArbitrLink(c.case_number) : null;
+                    const generatedLink = damiaLinks.length === 0 ? generateCourtLink(c.case_number) : null;
 
                     return (damiaLinks.length > 0 || generatedLink) && (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -168,16 +221,16 @@ export default function CourtPracticeResult({ result }: Props) {
                         ))}
                         {generatedLink && (
                           <a
-                            href={generatedLink}
+                            href={generatedLink.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-orange-600/30 text-orange-400 hover:bg-orange-600/50 hover:text-orange-300 transition-colors"
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${getLinkColorClasses(generatedLink.color)}`}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
                               <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
                               <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
                             </svg>
-                            Найти в КАД
+                            {generatedLink.label}
                           </a>
                         )}
                       </div>
@@ -206,7 +259,7 @@ export default function CourtPracticeResult({ result }: Props) {
           {expandedSection === "likely" && (
             <div className="mt-3 space-y-2">
               {likelyCases.map((c, i) => {
-                const kadLink = generateKadArbitrLink(c.case_number);
+                const courtLink = generateCourtLink(c.case_number);
                 return (
                   <div key={i} className="bg-sgc-blue-500/50 rounded-lg p-3">
                     <div className="font-medium text-white">{c.case_number}</div>
@@ -218,19 +271,19 @@ export default function CourtPracticeResult({ result }: Props) {
                         {c.verification.actual_info}
                       </div>
                     )}
-                    {kadLink && (
+                    {courtLink && (
                       <div className="mt-2">
                         <a
-                          href={kadLink}
+                          href={courtLink.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-yellow-600/30 text-yellow-400 hover:bg-yellow-600/50 hover:text-yellow-300 transition-colors"
+                          className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${getLinkColorClasses("yellow")}`}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
                             <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
                             <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
                           </svg>
-                          Проверить в КАД
+                          Проверить на {courtLink.label}
                         </a>
                       </div>
                     )}
