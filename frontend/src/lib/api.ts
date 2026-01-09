@@ -132,7 +132,16 @@ export interface CaseReference {
 
 export interface VerifiedCase extends CaseReference {
   status: "VERIFIED" | "LIKELY_EXISTS" | "NOT_FOUND" | "NEEDS_MANUAL_CHECK";
-  verification: Record<string, unknown>;
+  verification_source?: "damia_api" | "perplexity_google";
+  verification: {
+    exists?: boolean;
+    confidence?: string;
+    sources?: string[];
+    links?: string[];
+    damia_data?: Record<string, unknown>;
+    actual_info?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface PeerReview {

@@ -183,6 +183,85 @@ export default function ConsiliumResult({ result, token }: Props) {
           )}
         </div>
       )}
+
+      {/* Источники */}
+      {(() => {
+        // Собираем все источники из верифицированных дел
+        const allSources: { url: string; title: string; source: string }[] = [];
+
+        result.verified_cases.forEach((c) => {
+          const verification = c.verification || {};
+          const verificationSource = c.verification_source || "unknown";
+
+          // Ссылки из DaMIA
+          if (verification.links) {
+            verification.links.forEach((link: string) => {
+              if (link) {
+                allSources.push({
+                  url: link,
+                  title: c.case_number || "Судебное дело",
+                  source: verificationSource === "damia_api" ? "kad.arbitr.ru" : "Поиск"
+                });
+              }
+            });
+          }
+
+          // Источники из Perplexity/Google
+          if (verification.sources) {
+            verification.sources.forEach((src: string) => {
+              if (src && !src.includes("DaMIA")) {
+                allSources.push({
+                  url: "",
+                  title: src,
+                  source: "Верификация"
+                });
+              }
+            });
+          }
+        });
+
+        if (allSources.length === 0) return null;
+
+        return (
+          <div className="bg-sgc-blue-700 rounded-xl p-4">
+            <button
+              onClick={() => toggleSection("sources")}
+              className="w-full flex justify-between items-center text-left"
+            >
+              <h3 className="text-md font-semibold text-gray-300">
+                Источники ({allSources.length})
+              </h3>
+              <span>{expandedSection === "sources" ? "v" : ">"}</span>
+            </button>
+
+            {expandedSection === "sources" && (
+              <div className="mt-3 space-y-2">
+                {allSources.map((src, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <span className="text-gray-500">{i + 1}.</span>
+                    {src.url ? (
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 hover:underline flex-1"
+                      >
+                        {src.title}
+                        <span className="text-gray-500 ml-2">({src.source})</span>
+                      </a>
+                    ) : (
+                      <span className="text-gray-300 flex-1">
+                        {src.title}
+                        <span className="text-gray-500 ml-2">({src.source})</span>
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
