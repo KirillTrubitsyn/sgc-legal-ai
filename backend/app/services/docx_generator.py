@@ -7,11 +7,8 @@ import re
 from datetime import datetime
 from typing import Optional
 from docx import Document
-from docx.shared import Pt, Cm, Twips
+from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
 
 
 def create_response_docx(
@@ -50,7 +47,6 @@ def create_response_docx(
     title_run.bold = True
     title_run.font.size = Pt(16)
     title_run.font.name = 'Times New Roman'
-    title._element.rPr.rFonts.set(qn('w:eastAsia'), 'Times New Roman')
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.paragraph_format.space_after = Pt(6)
 
@@ -161,7 +157,6 @@ def _setup_styles(doc: Document):
     style = styles['Normal']
     style.font.name = 'Times New Roman'
     style.font.size = Pt(12)
-    style._element.rPr.rFonts.set(qn('w:eastAsia'), 'Times New Roman')
 
     # Paragraph formatting
     style.paragraph_format.line_spacing = 1.15
