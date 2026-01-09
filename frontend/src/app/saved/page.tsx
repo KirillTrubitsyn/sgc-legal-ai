@@ -10,6 +10,7 @@ export default function SavedPage() {
   const [responses, setResponses] = useState<SavedResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const router = useRouter();
 
   useEffect(() => {
@@ -35,18 +36,37 @@ export default function SavedPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm("Удалить этот ответ?")) return;
 
     try {
       await deleteSavedResponse(token, id);
       setResponses((prev) => prev.filter((r) => r.id !== id));
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (e) {
       console.error("Failed to delete:", e);
     }
   };
 
-  const handleDownload = async (response: SavedResponse) => {
+  const handleDownload = async (response: SavedResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
     setDownloadingId(response.id);
     try {
       const blob = await exportAsDocx(token, response.question, response.answer, response.model);
@@ -57,6 +77,18 @@ export default function SavedPage() {
     } finally {
       setDownloadingId(null);
     }
+  };
+
+  const handleContinueChat = (response: SavedResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Сохраняем контекст в localStorage для продолжения в чате
+    const chatContext = {
+      question: response.question,
+      answer: response.answer,
+      model: response.model,
+    };
+    localStorage.setItem("sgc_continue_chat", JSON.stringify(chatContext));
+    router.push("/chat?continue=true");
   };
 
   return (
@@ -96,62 +128,101 @@ export default function SavedPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {responses.map((response) => (
-                <div
-                  key={response.id}
-                  className="bg-sgc-blue-700 rounded-lg overflow-hidden"
-                >
-                  {/* Question */}
-                  <div className="bg-sgc-blue-600 px-4 py-3 border-b border-sgc-blue-500">
-                    <div className="flex justify-between items-start gap-4">
-                      <div>
-                        <span className="text-xs text-gray-400 block mb-1">
-                          Вопрос
-                        </span>
-                        <p className="text-white">{response.question || "—"}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs text-gray-500">
-                          {new Date(response.created_at).toLocaleDateString("ru-RU")}
-                        </span>
-                        {response.model && (
-                          <span className="text-xs text-gray-500 block">
-                            {response.model.split("/").pop()}
+            <div className="space-y-3">
+              {responses.map((response) => {
+                const isExpanded = expandedIds.has(response.id);
+                return (
+                  <div
+                    key={response.id}
+                    className="bg-sgc-blue-700 rounded-lg overflow-hidden"
+                  >
+                    {/* Accordion Header - Always visible */}
+                    <div
+                      onClick={() => toggleExpand(response.id)}
+                      className="bg-sgc-blue-600 px-4 py-3 cursor-pointer hover:bg-sgc-blue-550 transition-colors"
+                    >
+                      <div className="flex justify-between items-center gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Chevron */}
+                          <svg
+                            className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          {/* Question preview */}
+                          <p className="text-white truncate">
+                            {response.question || "—"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-gray-500">
+                            {new Date(response.created_at).toLocaleDateString("ru-RU")}
                           </span>
-                        )}
+                          {response.model && (
+                            <span className="text-xs text-gray-500 hidden sm:inline">
+                              {response.model.split("/").pop()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Answer */}
-                  <div className="px-4 py-4">
-                    <span className="text-xs text-gray-400 block mb-2">
-                      Ответ
-                    </span>
-                    <div className="text-gray-100">
-                      <MarkdownText content={response.answer} />
-                    </div>
-                  </div>
+                    {/* Accordion Content - Collapsible */}
+                    {isExpanded && (
+                      <>
+                        {/* Question full */}
+                        <div className="px-4 py-3 border-b border-sgc-blue-500">
+                          <span className="text-xs text-gray-400 block mb-1">
+                            Вопрос
+                          </span>
+                          <p className="text-white whitespace-pre-wrap">{response.question}</p>
+                        </div>
 
-                  {/* Actions */}
-                  <div className="px-4 py-3 border-t border-sgc-blue-500 flex justify-end gap-4">
-                    <button
-                      onClick={() => handleDownload(response)}
-                      disabled={downloadingId === response.id}
-                      className="text-gray-400 hover:text-white text-sm"
-                    >
-                      {downloadingId === response.id ? "..." : "Скачать .docx"}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(response.id)}
-                      className="text-red-400 hover:text-red-300 text-sm"
-                    >
-                      Удалить
-                    </button>
+                        {/* Answer */}
+                        <div className="px-4 py-4">
+                          <span className="text-xs text-gray-400 block mb-2">
+                            Ответ
+                          </span>
+                          <div className="text-gray-100">
+                            <MarkdownText content={response.answer} />
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="px-4 py-3 border-t border-sgc-blue-500 flex flex-wrap justify-between gap-3">
+                          <button
+                            onClick={(e) => handleContinueChat(response, e)}
+                            className="text-sgc-orange hover:text-orange-300 text-sm font-medium flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            Продолжить чат
+                          </button>
+                          <div className="flex gap-4">
+                            <button
+                              onClick={(e) => handleDownload(response, e)}
+                              disabled={downloadingId === response.id}
+                              className="text-gray-400 hover:text-white text-sm"
+                            >
+                              {downloadingId === response.id ? "..." : "Скачать .docx"}
+                            </button>
+                            <button
+                              onClick={(e) => handleDelete(response.id, e)}
+                              className="text-red-400 hover:text-red-300 text-sm"
+                            >
+                              Удалить
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
