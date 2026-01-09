@@ -58,6 +58,11 @@ export default function LoadingSpinner({ message = "Анализирую зап�
       <div className="mt-3 w-32 h-1 bg-sgc-blue-700 rounded-full overflow-hidden">
         <div className="h-full bg-gradient-to-r from-sgc-orange-500 to-sgc-orange-400 rounded-full animate-progress" />
       </div>
+
+      {/* Mobile warning */}
+      <div className="mt-4 text-xs text-gray-500 text-center max-w-xs">
+        Не сворачивайте приложение до завершения
+      </div>
     </div>
   );
 }

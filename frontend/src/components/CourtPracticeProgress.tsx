@@ -53,6 +53,10 @@ export default function CourtPracticeProgress({ currentStage, message }: Props) 
       <div className="text-center text-gray-300">
         <span className="animate-pulse">...</span> {message}
       </div>
+
+      <div className="mt-3 text-xs text-gray-500 text-center">
+        Не сворачивайте приложение до завершения
+      </div>
     </div>
   );
 }

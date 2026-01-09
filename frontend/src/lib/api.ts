@@ -72,28 +72,37 @@ export async function sendQuery(
 
   if (!reader) throw new Error("No response body");
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    const text = decoder.decode(value);
-    const lines = text.split("\n");
+      const text = decoder.decode(value);
+      const lines = text.split("\n");
 
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        if (data === "[DONE]") return;
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "[DONE]") return;
 
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) throw new Error(parsed.error);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) onChunk(content);
-        } catch (e) {
-          // Skip non-JSON lines
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) throw new Error(parsed.error);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) onChunk(content);
+          } catch {
+            // Skip non-JSON lines
+          }
         }
       }
     }
+  } catch (err) {
+    // Handle connection errors (e.g., when app goes to background on mobile)
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    if (errorMessage.includes("Load failed") || errorMessage.includes("network") || errorMessage.includes("abort")) {
+      throw new Error("Соединение прервано. Не сворачивайте приложение во время обработки запроса.");
+    }
+    throw err;
   }
 }
 
@@ -190,40 +199,49 @@ export async function runConsilium(
   let finalResult: ConsiliumResult | null = null;
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    // Process complete lines from buffer
-    const lines = buffer.split("\n");
-    // Keep the last incomplete line in buffer
-    buffer = lines.pop() || "";
+      // Process complete lines from buffer
+      const lines = buffer.split("\n");
+      // Keep the last incomplete line in buffer
+      buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") {
-          if (finalResult) return finalResult;
-          throw new Error("No result received");
-        }
-
-        if (!data) continue;
-
-        try {
-          const parsed = JSON.parse(data) as StageUpdate;
-          onStageUpdate(parsed);
-
-          if (parsed.stage === "complete" && parsed.result) {
-            finalResult = parsed.result;
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") {
+            if (finalResult) return finalResult;
+            throw new Error("No result received");
           }
-        } catch (e) {
-          // JSON parse error - might be incomplete, skip
-          console.log("Parse error:", e, "Data:", data.substring(0, 100));
+
+          if (!data) continue;
+
+          try {
+            const parsed = JSON.parse(data) as StageUpdate;
+            onStageUpdate(parsed);
+
+            if (parsed.stage === "complete" && parsed.result) {
+              finalResult = parsed.result;
+            }
+          } catch (e) {
+            // JSON parse error - might be incomplete, skip
+            console.log("Parse error:", e, "Data:", data.substring(0, 100));
+          }
         }
       }
     }
+  } catch (err) {
+    // Handle connection errors (e.g., when app goes to background on mobile)
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    if (errorMessage.includes("Load failed") || errorMessage.includes("network") || errorMessage.includes("abort")) {
+      throw new Error("Соединение прервано. Не сворачивайте приложение во время обработки запроса.");
+    }
+    throw err;
   }
 
   // Process any remaining data in buffer
@@ -648,37 +666,46 @@ export async function searchCourtPractice(
   let finalResult: CourtPracticeResult | null = null;
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") {
-          if (finalResult) return finalResult;
-          throw new Error("No result received");
-        }
-
-        if (!data) continue;
-
-        try {
-          const parsed = JSON.parse(data) as CourtPracticeStageUpdate;
-          onStageUpdate(parsed);
-
-          if (parsed.stage === "complete" && parsed.result) {
-            finalResult = parsed.result;
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") {
+            if (finalResult) return finalResult;
+            throw new Error("No result received");
           }
-        } catch {
-          console.log("Parse error for court practice update");
+
+          if (!data) continue;
+
+          try {
+            const parsed = JSON.parse(data) as CourtPracticeStageUpdate;
+            onStageUpdate(parsed);
+
+            if (parsed.stage === "complete" && parsed.result) {
+              finalResult = parsed.result;
+            }
+          } catch {
+            console.log("Parse error for court practice update");
+          }
         }
       }
     }
+  } catch (err) {
+    // Handle connection errors (e.g., when app goes to background on mobile)
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    if (errorMessage.includes("Load failed") || errorMessage.includes("network") || errorMessage.includes("abort")) {
+      throw new Error("Соединение прервано. Не сворачивайте приложение во время обработки запроса.");
+    }
+    throw err;
   }
 
   // Process remaining buffer
