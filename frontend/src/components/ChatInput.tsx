@@ -52,7 +52,7 @@ export default function ChatInput({
                    resize-none disabled:opacity-50"
       />
       <button
-        onClick={handleSend}
+        onClick={() => handleSend()}
         disabled={!input.trim() || disabled}
         type="button"
         className="px-4 py-3 bg-sgc-orange-500 hover:bg-orange-600 disabled:bg-gray-600
@@ -62,7 +62,7 @@ export default function ChatInput({
         {disabled ? (
           <span className="animate-pulse">...</span>
         ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
             <polyline points="12 5 19 12 12 19"></polyline>
           </svg>
