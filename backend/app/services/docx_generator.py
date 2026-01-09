@@ -301,36 +301,37 @@ def _add_formatted_text(doc: Document, text: str):
         if current_para is None or in_list:
             current_para = doc.add_paragraph()
             current_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            current_para.paragraph_format.first_line_indent = Cm(1)
-            current_para.paragraph_format.space_after = Pt(3)
+            current_para.paragraph_format.first_line_indent = Cm(1.25)
+            current_para.paragraph_format.space_after = Pt(6)
             current_para.paragraph_format.space_before = Pt(0)
             in_list = False
         else:
             current_para.add_run(' ')
 
-        _add_inline_formatting(current_para, stripped)
+        _add_plain_text(current_para, stripped)
+
+
+def _add_plain_text(paragraph, text: str):
+    """Add plain text without markdown formatting"""
+    # Remove any remaining markdown symbols
+    clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove **bold**
+    clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove *italic*
+    clean_text = re.sub(r'—', ',', clean_text)  # Replace em-dash with comma
+    clean_text = re.sub(r'–', ',', clean_text)  # Replace en-dash with comma
+
+    run = paragraph.add_run(clean_text)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(11)
 
 
 def _add_inline_formatting(paragraph, text: str):
-    """Add text with inline markdown formatting"""
-    pattern = r'(\*\*.*?\*\*|\*[^*]+?\*)'
-    parts = re.split(pattern, text)
+    """Add text with inline markdown formatting (legacy, kept for bullet lists)"""
+    # Clean markdown from text
+    clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)
+    clean_text = re.sub(r'—', ',', clean_text)
+    clean_text = re.sub(r'–', ',', clean_text)
 
-    for part in parts:
-        if not part:
-            continue
-
-        if part.startswith('**') and part.endswith('**'):
-            run = paragraph.add_run(part[2:-2])
-            run.bold = True
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(11)
-        elif part.startswith('*') and part.endswith('*') and len(part) > 2:
-            run = paragraph.add_run(part[1:-1])
-            run.italic = True
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(11)
-        else:
-            run = paragraph.add_run(part)
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(11)
+    run = paragraph.add_run(clean_text)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(11)
