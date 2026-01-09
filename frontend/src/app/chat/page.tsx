@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   getModels,
   sendQuery,
@@ -62,7 +62,6 @@ export default function ChatPage() {
   const [continuedFromSaved, setContinuedFromSaved] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     const storedToken = localStorage.getItem("sgc_token");
@@ -85,7 +84,8 @@ export default function ChatPage() {
       .catch(console.error);
 
     // Load chat history (only if not continuing from saved)
-    const isContinue = searchParams.get("continue") === "true";
+    const urlParams = new URLSearchParams(window.location.search);
+    const isContinue = urlParams.get("continue") === "true";
     if (!isContinue) {
       getChatHistory(storedToken)
         .then((history) => {
@@ -99,11 +99,12 @@ export default function ChatPage() {
         })
         .catch(console.error);
     }
-  }, [router, searchParams]);
+  }, [router]);
 
   // Handle continue from saved response
   useEffect(() => {
-    const isContinue = searchParams.get("continue") === "true";
+    const urlParams = new URLSearchParams(window.location.search);
+    const isContinue = urlParams.get("continue") === "true";
     if (isContinue && !continuedFromSaved) {
       const savedContext = localStorage.getItem("sgc_continue_chat");
       if (savedContext) {
@@ -137,7 +138,7 @@ export default function ChatPage() {
         }
       }
     }
-  }, [searchParams, token, models, continuedFromSaved, router]);
+  }, [token, models, continuedFromSaved, router]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
