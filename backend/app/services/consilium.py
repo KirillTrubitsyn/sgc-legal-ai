@@ -16,6 +16,40 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def clean_markdown(text: str) -> str:
+    """
+    Удаляет маркдаун-разметку из текста для чистого отображения.
+    """
+    if not text:
+        return text
+
+    # Удаляем заголовки #### ### ## #
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+
+    # Удаляем **bold** и *italic*
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+
+    # Удаляем __bold__ и _italic_
+    text = re.sub(r'__([^_]+)__', r'\1', text)
+    text = re.sub(r'_([^_]+)_', r'\1', text)
+
+    # Удаляем ``` блоки кода
+    text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
+
+    # Удаляем `inline code`
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+
+    # Удаляем горизонтальные линии
+    text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\*\*\*+$', '', text, flags=re.MULTILINE)
+
+    # Удаляем лишние пустые строки
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
+
+
 # Модели консилиума
 CONSILIUM_MODELS = {
     "chairman": "anthropic/claude-opus-4.5",
@@ -568,6 +602,8 @@ async def stage_5_final_synthesis(
             None,
             lambda: chat_completion(CONSILIUM_MODELS["chairman"], messages, stream=False, max_tokens=4096)
         )
-        return response["choices"][0]["message"]["content"]
+        raw_content = response["choices"][0]["message"]["content"]
+        # Очищаем маркдаун из ответа
+        return clean_markdown(raw_content)
     except Exception as e:
         return f"Ошибка синтеза: {str(e)}"
