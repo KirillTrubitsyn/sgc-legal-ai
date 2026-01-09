@@ -59,6 +59,7 @@ export default function ChatPage() {
   const [courtPracticeMessage, setCourtPracticeMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
   const [pendingText, setPendingText] = useState("");
+  const [continuedFromSaved, setContinuedFromSaved] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -82,19 +83,62 @@ export default function ChatPage() {
       })
       .catch(console.error);
 
-    // Load chat history
-    getChatHistory(storedToken)
-      .then((history) => {
-        if (history.length > 0) {
-          const loadedMessages: Message[] = history.map((m) => ({
-            role: m.role,
-            content: m.content,
-          }));
-          setMessages(loadedMessages);
-        }
-      })
-      .catch(console.error);
+    // Load chat history (only if not continuing from saved)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isContinue = urlParams.get("continue") === "true";
+    if (!isContinue) {
+      getChatHistory(storedToken)
+        .then((history) => {
+          if (history.length > 0) {
+            const loadedMessages: Message[] = history.map((m) => ({
+              role: m.role,
+              content: m.content,
+            }));
+            setMessages(loadedMessages);
+          }
+        })
+        .catch(console.error);
+    }
   }, [router]);
+
+  // Handle continue from saved response
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isContinue = urlParams.get("continue") === "true";
+    if (isContinue && !continuedFromSaved) {
+      const savedContext = localStorage.getItem("sgc_continue_chat");
+      if (savedContext) {
+        try {
+          const context = JSON.parse(savedContext);
+          // Clear the history first for a fresh conversation with context
+          if (token) {
+            clearChatHistory(token).then(() => {
+              // Add the saved Q&A as context
+              const contextMessages: Message[] = [
+                { role: "user", content: context.question },
+                { role: "assistant", content: context.answer },
+              ];
+              setMessages(contextMessages);
+              setContinuedFromSaved(true);
+              // Set the model if available
+              if (context.model && models.length > 0) {
+                const modelExists = models.some(m => m.id === context.model);
+                if (modelExists) {
+                  setSelectedModel(context.model);
+                }
+              }
+            });
+          }
+          // Clean up
+          localStorage.removeItem("sgc_continue_chat");
+          // Remove query param from URL
+          router.replace("/chat");
+        } catch (e) {
+          console.error("Failed to parse continue chat context:", e);
+        }
+      }
+    }
+  }, [token, models, continuedFromSaved, router]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
