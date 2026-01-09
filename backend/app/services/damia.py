@@ -28,8 +28,10 @@ async def verify_case_damia(case_number: str) -> Dict[str, Any]:
             "error": str | None
         }
     """
-    if not settings.damia_api_key:
-        logger.warning("DaMIA API key not configured")
+    # Проверяем наличие API ключа
+    api_key = settings.damia_api_key
+    if not api_key:
+        logger.warning("DaMIA API key not configured (DAMIA_API_KEY env var is empty)")
         return {
             "exists": False,
             "case_data": None,
@@ -39,29 +41,37 @@ async def verify_case_damia(case_number: str) -> Dict[str, Any]:
     # Нормализуем номер дела (убираем лишние пробелы)
     normalized_case_number = case_number.strip()
 
+    logger.info(f"DaMIA: checking case {normalized_case_number}, API key configured: {bool(api_key)}, key prefix: {api_key[:4] if len(api_key) > 4 else '***'}...")
+
     try:
         async with httpx.AsyncClient(timeout=DAMIA_TIMEOUT) as client:
-            response = await client.get(
-                DAMIA_API_URL,
-                params={
-                    "regn": normalized_case_number,
-                    "key": settings.damia_api_key
-                }
-            )
+            url = DAMIA_API_URL
+            params = {
+                "regn": normalized_case_number,
+                "key": api_key
+            }
+
+            logger.info(f"DaMIA: sending request to {url} with regn={normalized_case_number}")
+
+            response = await client.get(url, params=params)
+
+            logger.info(f"DaMIA: response status {response.status_code} for case {normalized_case_number}")
 
             if response.status_code == 200:
                 data = response.json()
+                logger.info(f"DaMIA: got response data for {normalized_case_number}: {str(data)[:200]}...")
                 return _parse_damia_response(data, normalized_case_number)
             elif response.status_code == 404:
-                logger.info(f"DaMIA: case {normalized_case_number} not found")
+                logger.info(f"DaMIA: case {normalized_case_number} not found (404)")
                 return {
                     "exists": False,
                     "case_data": None,
                     "error": None
                 }
             else:
+                response_text = response.text[:500] if response.text else "empty"
                 error_msg = f"DaMIA API error: HTTP {response.status_code}"
-                logger.error(f"{error_msg} for case {normalized_case_number}")
+                logger.error(f"{error_msg} for case {normalized_case_number}, response: {response_text}")
                 return {
                     "exists": False,
                     "case_data": None,
@@ -69,21 +79,21 @@ async def verify_case_damia(case_number: str) -> Dict[str, Any]:
                 }
 
     except httpx.TimeoutException:
-        logger.error(f"DaMIA API timeout for case {normalized_case_number}")
+        logger.error(f"DaMIA API timeout for case {normalized_case_number} (>{DAMIA_TIMEOUT}s)")
         return {
             "exists": False,
             "case_data": None,
             "error": "DaMIA API timeout"
         }
     except httpx.RequestError as e:
-        logger.error(f"DaMIA API request error for case {normalized_case_number}: {e}")
+        logger.error(f"DaMIA API request error for case {normalized_case_number}: {type(e).__name__}: {e}")
         return {
             "exists": False,
             "case_data": None,
             "error": f"Request error: {str(e)}"
         }
     except Exception as e:
-        logger.error(f"DaMIA API unexpected error for case {normalized_case_number}: {e}")
+        logger.error(f"DaMIA API unexpected error for case {normalized_case_number}: {type(e).__name__}: {e}")
         return {
             "exists": False,
             "case_data": None,
