@@ -24,6 +24,12 @@ from app.services.openrouter import (
 )
 from app.services.docx_generator import create_response_docx
 from app.services.web_search import web_search_stream
+from app.services.google_search import (
+    google_search,
+    async_google_search,
+    search_legal_topic,
+    format_search_results_for_display
+)
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -193,6 +199,84 @@ async def web_search_endpoint(
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+
+class GoogleSearchRequest(BaseModel):
+    query: str
+    num_results: int = 10
+    site_restrict: Optional[str] = None
+    search_type: str = "general"  # "general", "court_cases", "legal_topic"
+
+
+@router.post("/google-search")
+async def google_search_endpoint(
+    request: GoogleSearchRequest,
+    authorization: str = Header(None)
+):
+    """
+    Поиск через Google Custom Search API
+
+    search_type:
+    - general: Общий поиск
+    - court_cases: Поиск судебных дел
+    - legal_topic: Тематический юридический поиск
+    """
+    session = get_session_from_token(authorization)
+    user_id = session["user_id"]
+
+    # Save user search query
+    save_chat_message(user_id, "user", f"[Google Поиск] {request.query}", "google-search")
+
+    try:
+        if request.search_type == "legal_topic":
+            # Тематический поиск с разделением по типам
+            result = await search_legal_topic(request.query)
+            formatted = []
+
+            if result["court_cases"]:
+                formatted.append("**Судебная практика:**")
+                for i, case in enumerate(result["court_cases"], 1):
+                    formatted.append(f"{i}. [{case['title']}]({case['link']})")
+                    formatted.append(f"   {case['snippet']}\n")
+
+            if result["legislation"]:
+                formatted.append("\n**Законодательство:**")
+                for i, law in enumerate(result["legislation"], 1):
+                    formatted.append(f"{i}. [{law['title']}]({law['link']})")
+                    formatted.append(f"   {law['snippet']}\n")
+
+            content = "\n".join(formatted) if formatted else "По вашему запросу ничего не найдено."
+
+            save_chat_message(user_id, "assistant", content, "google-search")
+
+            return {
+                "success": True,
+                "content": content,
+                "raw_results": result,
+                "search_type": "legal_topic"
+            }
+        else:
+            # Общий поиск
+            result = await async_google_search(
+                request.query,
+                num_results=request.num_results,
+                site_restrict=request.site_restrict
+            )
+
+            content = format_search_results_for_display(result)
+            save_chat_message(user_id, "assistant", content, "google-search")
+
+            return {
+                "success": result.get("success", False),
+                "content": content,
+                "total_results": result.get("total_results", "0"),
+                "items": result.get("items", []),
+                "search_time": result.get("search_time", 0),
+                "error": result.get("error")
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/history")

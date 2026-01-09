@@ -521,7 +521,62 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-// Web Search API functions
+// Google Search API functions
+
+export interface GoogleSearchItem {
+  title: string;
+  link: string;
+  snippet: string;
+  is_legal_source: boolean;
+  priority: number;
+}
+
+export interface GoogleSearchResult {
+  success: boolean;
+  content: string;
+  total_results?: string;
+  items?: GoogleSearchItem[];
+  search_time?: number;
+  raw_results?: {
+    topic: string;
+    court_cases: Array<{ title: string; link: string; snippet: string }>;
+    legislation: Array<{ title: string; link: string; snippet: string }>;
+    total_found: number;
+  };
+  search_type?: string;
+  error?: string;
+}
+
+export async function googleSearch(
+  token: string,
+  query: string,
+  searchType: "general" | "court_cases" | "legal_topic" = "general",
+  numResults: number = 10,
+  siteRestrict?: string
+): Promise<GoogleSearchResult> {
+  const res = await fetch(`${API_URL}/api/query/google-search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      query,
+      num_results: numResults,
+      site_restrict: siteRestrict,
+      search_type: searchType,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Google Search failed");
+  }
+
+  return res.json();
+}
+
+// Web Search API functions (Perplexity)
 
 export async function webSearch(
   token: string,
