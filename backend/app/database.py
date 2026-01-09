@@ -55,21 +55,51 @@ def validate_invite_code(code: str) -> Optional[Dict]:
 
 
 def create_session(invite_code_id: str, user_name: str) -> Optional[str]:
-    """Create session for user"""
+    """Create session for user (reuse existing user if found)"""
     try:
         client = get_client()
 
-        # Create user
-        user_response = client.post(
+        # Check if user already exists for this invite code
+        existing_user_response = client.get(
             "/users",
-            json={
-                "invite_code_id": invite_code_id,
-                "name": user_name
+            params={
+                "invite_code_id": f"eq.{invite_code_id}",
+                "select": "id,name"
             }
         )
-        user_response.raise_for_status()
-        user_data = user_response.json()
-        user_id = user_data[0]["id"]
+        existing_user_response.raise_for_status()
+        existing_users = existing_user_response.json()
+
+        if existing_users:
+            # Reuse existing user
+            user_id = existing_users[0]["id"]
+        else:
+            # Create new user (first login with this invite code)
+            user_response = client.post(
+                "/users",
+                json={
+                    "invite_code_id": invite_code_id,
+                    "name": user_name
+                }
+            )
+            user_response.raise_for_status()
+            user_data = user_response.json()
+            user_id = user_data[0]["id"]
+
+            # Decrement uses_remaining only on first login
+            invite_response = client.get(
+                "/invite_codes",
+                params={"id": f"eq.{invite_code_id}", "select": "uses_remaining"}
+            )
+            invite_response.raise_for_status()
+            current_uses = invite_response.json()[0]["uses_remaining"]
+
+            update_response = client.patch(
+                "/invite_codes",
+                params={"id": f"eq.{invite_code_id}"},
+                json={"uses_remaining": current_uses - 1}
+            )
+            update_response.raise_for_status()
 
         # Generate token
         token = secrets.token_urlsafe(32)
@@ -83,22 +113,6 @@ def create_session(invite_code_id: str, user_name: str) -> Optional[str]:
             }
         )
         session_response.raise_for_status()
-
-        # Get current uses_remaining
-        invite_response = client.get(
-            "/invite_codes",
-            params={"id": f"eq.{invite_code_id}", "select": "uses_remaining"}
-        )
-        invite_response.raise_for_status()
-        current_uses = invite_response.json()[0]["uses_remaining"]
-
-        # Decrement uses_remaining
-        update_response = client.patch(
-            "/invite_codes",
-            params={"id": f"eq.{invite_code_id}"},
-            json={"uses_remaining": current_uses - 1}
-        )
-        update_response.raise_for_status()
 
         return token
     except Exception as e:
