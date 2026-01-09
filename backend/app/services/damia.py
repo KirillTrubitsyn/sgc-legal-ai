@@ -121,6 +121,7 @@ def _parse_damia_response(data: Any, case_number: str) -> Dict[str, Any]:
     """
     # Если ответ пустой или не содержит данных
     if not data:
+        logger.info(f"DaMIA: empty response for case {case_number}")
         return {
             "exists": False,
             "case_data": None,
@@ -128,51 +129,79 @@ def _parse_damia_response(data: Any, case_number: str) -> Dict[str, Any]:
         }
 
     # DaMIA может возвращать список дел или одно дело
-    # Ищем совпадение по номеру дела
     cases = data if isinstance(data, list) else [data]
 
-    for case in cases:
-        if not isinstance(case, dict):
-            continue
+    # Фильтруем только словари
+    valid_cases = [c for c in cases if isinstance(c, dict) and c.get("РегНомер")]
 
-        # Проверяем, что дело найдено по номеру
-        reg_number = case.get("РегНомер", "")
+    if not valid_cases:
+        logger.info(f"DaMIA: no valid cases in response for {case_number}, raw: {str(data)[:200]}")
+        return {
+            "exists": False,
+            "case_data": None,
+            "error": None
+        }
 
-        # Нормализуем для сравнения (игнорируем регистр и пробелы)
-        if _normalize_case_number(reg_number) == _normalize_case_number(case_number):
-            # Парсим все доступные поля
-            case_data = {
-                "reg_number": case.get("РегНомер"),
-                "court": case.get("Суд"),
-                "date": case.get("Дата"),
-                "case_type": case.get("Тип"),
-                "status": case.get("Статус"),
-                "url": case.get("Url"),
-                "amount": case.get("Сумма"),
-                "judge": case.get("Судья"),
-                # Дополнительные поля для саммари
-                "plaintiff": case.get("Истец") or case.get("Заявитель"),
-                "defendant": case.get("Ответчик"),
-                "subject": case.get("Предмет") or case.get("Категория"),
-                "description": case.get("Описание") or case.get("Результат"),
-                "raw_data": case  # Сохраняем исходные данные на всякий случай
-            }
+    # Если DaMIA вернул ровно 1 результат — это искомое дело (API ищет по номеру)
+    # Если несколько — ищем по совпадению номера
+    matched_case = None
 
-            # Генерируем саммари из доступных данных
-            case_data["summary"] = _generate_case_summary(case_data)
+    if len(valid_cases) == 1:
+        matched_case = valid_cases[0]
+        logger.info(f"DaMIA: single result for {case_number}, using it")
+    else:
+        # Ищем совпадение по номеру
+        normalized_query = _normalize_case_number(case_number)
+        for case in valid_cases:
+            reg_number = case.get("РегНомер", "")
+            if _normalize_case_number(reg_number) == normalized_query:
+                matched_case = case
+                break
 
-            logger.info(f"DaMIA: case {case_number} VERIFIED")
-            return {
-                "exists": True,
-                "case_data": case_data,
-                "error": None
-            }
+        # Если точного совпадения нет, проверяем частичное (без года)
+        if not matched_case:
+            query_base = normalized_query.split("/")[0] if "/" in normalized_query else normalized_query
+            for case in valid_cases:
+                reg_number = case.get("РегНомер", "")
+                reg_base = _normalize_case_number(reg_number).split("/")[0] if "/" in reg_number else _normalize_case_number(reg_number)
+                if reg_base == query_base:
+                    matched_case = case
+                    logger.info(f"DaMIA: partial match for {case_number} -> {reg_number}")
+                    break
 
-    # Дело не найдено в ответе
-    logger.info(f"DaMIA: case {case_number} not found in response")
+    if not matched_case:
+        logger.info(f"DaMIA: case {case_number} not found in {len(valid_cases)} results")
+        return {
+            "exists": False,
+            "case_data": None,
+            "error": None
+        }
+
+    # Парсим все доступные поля
+    case_data = {
+        "reg_number": matched_case.get("РегНомер"),
+        "court": matched_case.get("Суд"),
+        "date": matched_case.get("Дата"),
+        "case_type": matched_case.get("Тип"),
+        "status": matched_case.get("Статус"),
+        "url": matched_case.get("Url"),
+        "amount": matched_case.get("Сумма"),
+        "judge": matched_case.get("Судья"),
+        # Дополнительные поля для саммари
+        "plaintiff": matched_case.get("Истец") or matched_case.get("Заявитель"),
+        "defendant": matched_case.get("Ответчик"),
+        "subject": matched_case.get("Предмет") or matched_case.get("Категория"),
+        "description": matched_case.get("Описание") or matched_case.get("Результат"),
+        "raw_data": matched_case  # Сохраняем исходные данные на всякий случай
+    }
+
+    # Генерируем саммари из доступных данных
+    case_data["summary"] = _generate_case_summary(case_data)
+
+    logger.info(f"DaMIA: case {case_number} VERIFIED, url: {case_data.get('url')}")
     return {
-        "exists": False,
-        "case_data": None,
+        "exists": True,
+        "case_data": case_data,
         "error": None
     }
 
@@ -228,8 +257,30 @@ def _generate_case_summary(case_data: Dict) -> str:
 def _normalize_case_number(case_number: str) -> str:
     """
     Нормализует номер дела для сравнения.
-    Убирает пробелы, приводит к нижнему регистру.
+    - Убирает пробелы
+    - Приводит к нижнему регистру
+    - Заменяет латинские буквы на кириллические (A→А, C→С, etc.)
+    - Нормализует тире и слеши
+    - Нормализует год (2024 и 24 считаются одинаковыми)
     """
     if not case_number:
         return ""
-    return case_number.strip().lower().replace(" ", "")
+
+    result = case_number.strip().lower()
+
+    # Заменяем латинские буквы на кириллические
+    latin_to_cyrillic = {
+        'a': 'а', 'c': 'с', 'e': 'е', 'o': 'о', 'p': 'р',
+        'h': 'н', 'k': 'к', 'm': 'м', 't': 'т', 'x': 'х',
+        'b': 'в'
+    }
+    for lat, cyr in latin_to_cyrillic.items():
+        result = result.replace(lat, cyr)
+
+    # Убираем пробелы
+    result = result.replace(" ", "")
+
+    # Нормализуем тире (разные виды → обычное)
+    result = result.replace("–", "-").replace("—", "-")
+
+    return result
