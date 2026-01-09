@@ -5,3 +5,75 @@
 body {
   background: linear-gradient(135deg, #0a1520 0%, #1e3a5f 100%);
 }
+
+/* Loading spinner animations */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-slow-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes ping-slow {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.1); opacity: 0.1; }
+}
+
+@keyframes ping-slower {
+  0%, 100% { transform: scale(1); opacity: 0.2; }
+  50% { transform: scale(1.15); opacity: 0.05; }
+}
+
+@keyframes progress {
+  0% { width: 0%; transform: translateX(0); }
+  50% { width: 100%; transform: translateX(0); }
+  100% { width: 100%; transform: translateX(100%); }
+}
+
+@keyframes bounce-dot {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 4s linear infinite;
+}
+
+.animate-spin-slow-reverse {
+  animation: spin-slow-reverse 5s linear infinite;
+}
+
+.animate-spin-medium {
+  animation: spin-slow 3s linear infinite;
+}
+
+.animate-spin-medium-reverse {
+  animation: spin-slow-reverse 3.5s linear infinite;
+}
+
+.animate-ping-slow {
+  animation: ping-slow 2s ease-in-out infinite;
+}
+
+.animate-ping-slower {
+  animation: ping-slower 3s ease-in-out infinite;
+}
+
+.animate-progress {
+  animation: progress 2s ease-in-out infinite;
+}
+
+.animate-bounce-dot-1 {
+  animation: bounce-dot 1.4s ease-in-out infinite;
+}
+
+.animate-bounce-dot-2 {
+  animation: bounce-dot 1.4s ease-in-out infinite 0.2s;
+}
+
+.animate-bounce-dot-3 {
+  animation: bounce-dot 1.4s ease-in-out infinite 0.4s;
+}
