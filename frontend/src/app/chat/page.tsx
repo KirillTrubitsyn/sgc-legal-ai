@@ -18,6 +18,7 @@ import {
 import ModelSelector from "@/components/ModelSelector";
 import ModeSelector from "@/components/ModeSelector";
 import ChatMessage from "@/components/ChatMessage";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import ChatInput from "@/components/ChatInput";
 import ConsiliumProgress from "@/components/ConsiliumProgress";
 import ConsiliumResultComponent from "@/components/ConsiliumResult";
@@ -334,6 +335,13 @@ export default function ChatPage() {
                   />
                 );
               })}
+
+              {/* Loading spinner before response starts */}
+              {isLoading && !streamingContent && !consiliumStage && (
+                <LoadingSpinner
+                  message={mode === "single" ? "Анализирую запрос..." : "Запускаю консилиум..."}
+                />
+              )}
 
               {streamingContent && (
                 <ChatMessage
