@@ -33,14 +33,17 @@ export default function ChatMessage({ role, content, onSave, question, model, to
   };
 
   const handleDownload = async () => {
-    if (!token || !question || downloading) return;
+    if (downloading || !token) return;
+    // Используем content как вопрос если question не передан
+    const questionText = question || "Юридический запрос";
     setDownloading(true);
     try {
-      const blob = await exportAsDocx(token, question, content, model);
+      const blob = await exportAsDocx(token, questionText, content, model);
       const timestamp = new Date().toISOString().slice(0, 10);
       downloadBlob(blob, `sgc-legal-${timestamp}.docx`);
     } catch (e) {
       console.error("Failed to download:", e);
+      alert("Ошибка при скачивании документа");
     } finally {
       setDownloading(false);
     }
@@ -64,11 +67,12 @@ export default function ChatMessage({ role, content, onSave, question, model, to
         )}
         {showActions && (
           <div className="mt-2 pt-2 border-t border-gray-600/30 flex justify-end gap-2">
-            {token && question && (
+            {token && (
               <button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="text-xs px-2 py-1 rounded transition-colors text-gray-400 hover:text-white hover:bg-gray-600/30"
+                type="button"
+                className="text-xs px-3 py-1.5 rounded-lg transition-colors bg-sgc-blue-600 text-gray-200 hover:bg-sgc-blue-500 hover:text-white disabled:opacity-50"
               >
                 {downloading ? "..." : "Скачать .docx"}
               </button>
