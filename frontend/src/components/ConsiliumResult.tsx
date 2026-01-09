@@ -1,26 +1,90 @@
 "use client";
 
 import { useState } from "react";
-import { ConsiliumResult as ConsiliumResultType } from "@/lib/api";
+import { ConsiliumResult as ConsiliumResultType, saveResponse, exportAsDocx, downloadBlob } from "@/lib/api";
 
 interface Props {
   result: ConsiliumResultType;
+  token?: string;
 }
 
-export default function ConsiliumResult({ result }: Props) {
+export default function ConsiliumResult({ result, token }: Props) {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  const handleSave = async () => {
+    if (!token || saving || saved) return;
+    setSaving(true);
+    try {
+      await saveResponse(token, result.question, result.final_answer, "consilium");
+      setSaved(true);
+    } catch (err) {
+      console.error("Failed to save:", err);
+    }
+    setSaving(false);
+  };
+
+  const handleExport = async () => {
+    if (!token) return;
+    try {
+      const blob = await exportAsDocx(token, result.question, result.final_answer, "consilium");
+      downloadBlob(blob, "sgc-consilium-response.docx");
+    } catch (err) {
+      console.error("Failed to export:", err);
+    }
   };
 
   return (
     <div className="space-y-4">
       {/* Итоговый ответ */}
       <div className="bg-sgc-blue-700 rounded-xl p-6">
-        <h3 className="text-lg font-semibold mb-3 text-sgc-orange-500">
-          Итоговый ответ консилиума
-        </h3>
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-lg font-semibold text-sgc-orange-500">
+            Итоговый ответ консилиума
+          </h3>
+          {token && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving || saved}
+                className={`p-2 rounded-lg transition-colors ${
+                  saved
+                    ? "bg-green-600 text-white"
+                    : "bg-sgc-blue-500 text-gray-300 hover:text-white hover:bg-sgc-blue-400"
+                }`}
+                title={saved ? "Сохранено" : "Сохранить"}
+              >
+                {saved ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <path d="M20 6 9 17l-5-5"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={handleExport}
+                className="p-2 rounded-lg bg-sgc-blue-500 text-gray-300 hover:text-white hover:bg-sgc-blue-400 transition-colors"
+                title="Скачать DOCX"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
         <div className="text-gray-100 whitespace-pre-wrap">
           {result.final_answer}
         </div>

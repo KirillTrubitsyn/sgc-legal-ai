@@ -341,7 +341,7 @@ export default function ChatPage() {
                 if (isConsiliumMessage(item)) {
                   return (
                     <div key={idx} className="mb-4">
-                      <ConsiliumResultComponent result={item.result} />
+                      <ConsiliumResultComponent result={item.result} token={token} />
                     </div>
                   );
                 }
