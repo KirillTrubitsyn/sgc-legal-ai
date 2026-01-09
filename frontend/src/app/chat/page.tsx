@@ -224,7 +224,7 @@ export default function ChatPage() {
             <img
               src="/sgc-logo-horizontal.svg"
               alt="SGC Legal AI"
-              className="h-8"
+              className="h-10"
             />
           </div>
           <div className="flex items-center gap-4">
