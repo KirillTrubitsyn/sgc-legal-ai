@@ -6,11 +6,14 @@ import {
   getModels,
   sendQuery,
   runConsilium,
+  searchCourtPractice,
   Model,
   Message,
   ConsiliumResult,
   StageUpdate,
   FileUploadResult,
+  CourtPracticeResult,
+  CourtPracticeStageUpdate,
   getChatHistory,
   clearChatHistory,
   saveResponse,
@@ -22,6 +25,8 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import ChatInput from "@/components/ChatInput";
 import ConsiliumProgress from "@/components/ConsiliumProgress";
 import ConsiliumResultComponent from "@/components/ConsiliumResult";
+import CourtPracticeProgress from "@/components/CourtPracticeProgress";
+import CourtPracticeResultComponent from "@/components/CourtPracticeResult";
 import FileUpload from "@/components/FileUpload";
 import FilePreview from "@/components/FilePreview";
 
@@ -32,7 +37,12 @@ interface ConsiliumMessage {
   result: ConsiliumResult;
 }
 
-type ChatItem = Message | ConsiliumMessage;
+interface CourtPracticeMessage {
+  type: "court_practice";
+  result: CourtPracticeResult;
+}
+
+type ChatItem = Message | ConsiliumMessage | CourtPracticeMessage;
 
 export default function ChatPage() {
   const [userName, setUserName] = useState("");
@@ -45,6 +55,8 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState("");
   const [consiliumStage, setConsiliumStage] = useState("");
   const [consiliumMessage, setConsiliumMessage] = useState("");
+  const [courtPracticeStage, setCourtPracticeStage] = useState("");
+  const [courtPracticeMessage, setCourtPracticeMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
   const [pendingText, setPendingText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -86,7 +98,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, consiliumStage]);
+  }, [messages, streamingContent, consiliumStage, courtPracticeStage]);
 
   const handleLogout = () => {
     localStorage.removeItem("sgc_token");
@@ -189,6 +201,48 @@ export default function ChatPage() {
     setIsLoading(false);
   };
 
+  const handleCourtPracticeSearch = async (query: string) => {
+    if (isLoading || !query.trim()) return;
+
+    const userMessage: Message = { role: "user", content: `[Поиск судебной практики] ${query}` };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+    setPendingText("");
+    setCourtPracticeStage("search");
+    setCourtPracticeMessage("Начинаю поиск...");
+
+    try {
+      const result = await searchCourtPractice(
+        token,
+        query,
+        (update: CourtPracticeStageUpdate) => {
+          if (update.stage === "error") {
+            setCourtPracticeStage("");
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: `Ошибка: ${update.message}` },
+            ]);
+            return;
+          }
+          setCourtPracticeStage(update.stage);
+          setCourtPracticeMessage(update.message || "");
+        }
+      );
+
+      setMessages((prev) => [...prev, { type: "court_practice", result }]);
+      setCourtPracticeStage("");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setCourtPracticeStage("");
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Ошибка поиска: ${errorMessage}` },
+      ]);
+    }
+
+    setIsLoading(false);
+  };
+
   const handleNewChat = async () => {
     // Clear history in database
     if (token) {
@@ -197,12 +251,17 @@ export default function ChatPage() {
     setMessages([]);
     setStreamingContent("");
     setConsiliumStage("");
+    setCourtPracticeStage("");
     setUploadedFile(null);
     setPendingText("");
   };
 
   const isConsiliumMessage = (item: ChatItem): item is ConsiliumMessage => {
     return "type" in item && item.type === "consilium";
+  };
+
+  const isCourtPracticeMessage = (item: ChatItem): item is CourtPracticeMessage => {
+    return "type" in item && item.type === "court_practice";
   };
 
   return (
@@ -305,11 +364,19 @@ export default function ChatPage() {
                   );
                 }
 
+                if (isCourtPracticeMessage(item)) {
+                  return (
+                    <div key={idx} className="mb-4">
+                      <CourtPracticeResultComponent result={item.result} />
+                    </div>
+                  );
+                }
+
                 // Find previous user message for saving
                 const getPreviousUserMessage = () => {
                   for (let i = idx - 1; i >= 0; i--) {
                     const prev = messages[i];
-                    if (!isConsiliumMessage(prev) && prev.role === "user") {
+                    if (!isConsiliumMessage(prev) && !isCourtPracticeMessage(prev) && prev.role === "user") {
                       return prev.content;
                     }
                   }
@@ -337,7 +404,7 @@ export default function ChatPage() {
               })}
 
               {/* Loading spinner before response starts */}
-              {isLoading && !streamingContent && !consiliumStage && (
+              {isLoading && !streamingContent && !consiliumStage && !courtPracticeStage && (
                 <LoadingSpinner
                   message={mode === "single" ? "Анализирую запрос..." : "Запускаю консилиум..."}
                 />
@@ -354,6 +421,13 @@ export default function ChatPage() {
                 <ConsiliumProgress
                   currentStage={consiliumStage}
                   message={consiliumMessage}
+                />
+              )}
+
+              {courtPracticeStage && (
+                <CourtPracticeProgress
+                  currentStage={courtPracticeStage}
+                  message={courtPracticeMessage}
                 />
               )}
 
@@ -375,6 +449,7 @@ export default function ChatPage() {
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
+                onSearchCourtPractice={mode === "single" ? handleCourtPracticeSearch : undefined}
                 disabled={isLoading || (mode === "single" && !selectedModel)}
                 initialValue={pendingText}
                 placeholder={

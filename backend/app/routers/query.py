@@ -26,6 +26,7 @@ from app.services.openrouter import (
 )
 from app.services.docx_generator import create_response_docx
 from app.services.web_search import web_search_stream, web_search
+from app.services.court_practice_search import search_court_practice
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -268,6 +269,77 @@ async def web_search_endpoint(
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+
+class CourtPracticeRequest(BaseModel):
+    query: str
+
+
+@router.post("/court-practice")
+async def court_practice_search_endpoint(
+    request: CourtPracticeRequest,
+    authorization: str = Header(None)
+):
+    """
+    Search for court practice with DaMIA verification.
+    Returns verified court cases related to the query.
+    """
+    session = get_session_from_token(authorization)
+    user_id = session["user_id"]
+
+    # Save search query to history
+    save_chat_message(user_id, "user", f"[Поиск судебной практики] {request.query}", "court-practice-search")
+
+    # Use queue for stage updates
+    stage_queue = asyncio.Queue()
+
+    async def on_stage_update(stage: str, message: str):
+        await stage_queue.put({"stage": stage, "message": message})
+
+    async def generate():
+        try:
+            # Start search in background
+            search_task = asyncio.create_task(
+                search_court_practice(request.query, on_stage_update)
+            )
+
+            # Stream stage updates while search is running
+            while not search_task.done():
+                try:
+                    update = await asyncio.wait_for(stage_queue.get(), timeout=0.1)
+                    yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+
+            # Get final result
+            result = await search_task
+
+            # Drain any remaining updates
+            while not stage_queue.empty():
+                update = await stage_queue.get()
+                yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
+
+            # Send final result
+            yield f"data: {json.dumps({'stage': 'complete', 'result': result}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+            # Save result summary to history
+            if result:
+                verified_count = len([c for c in result.get('verified_cases', []) if c.get('status') == 'VERIFIED'])
+                summary = f"Найдено {verified_count} верифицированных дел по теме: {request.query}"
+                save_chat_message(user_id, "assistant", summary, "court-practice-search")
+
+        except Exception as e:
+            yield f"data: {json.dumps({'stage': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.get("/history")
