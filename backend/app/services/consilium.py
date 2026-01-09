@@ -8,7 +8,6 @@ from typing import List, Dict, Any, Optional, Callable, Awaitable
 from datetime import datetime
 
 from app.services.openrouter import chat_completion
-from app.services.google_search import verify_case_with_google
 from app.services.damia import verify_case_damia
 from app.config import settings
 import logging
@@ -241,15 +240,15 @@ async def stage_2_extract_cases(opinions: Dict[str, Any]) -> List[Dict]:
 
 async def stage_3_verify_cases(cases: List[Dict]) -> List[Dict]:
     """
-    Стадия 3: Гибридная верификация судебных дел
+    Стадия 3: Верификация судебных дел через DaMIA API + Perplexity
 
     Порядок верификации:
     1. DaMIA API (приоритетный источник) - прямой доступ к базе арбитражных дел
-    2. Если DaMIA не нашёл или ошибка -> fallback на Perplexity + Google Search
+    2. Если DaMIA не нашёл или ошибка -> fallback на Perplexity Sonar Pro
 
     verification_source в результате:
     - "damia_api" - подтверждено через DaMIA API
-    - "perplexity_google" - подтверждено через Perplexity/Google (fallback)
+    - "perplexity" - подтверждено через Perplexity (fallback)
     """
     if not cases:
         return []
@@ -285,52 +284,41 @@ async def stage_3_verify_cases(cases: List[Dict]) -> List[Dict]:
             })
             continue
 
-        # Шаг 2: DaMIA не нашёл или ошибка -> fallback на Perplexity + Google
+        # Шаг 2: DaMIA не нашёл или ошибка -> fallback на Perplexity
         if damia_result.get("error"):
             logger.warning(f"DaMIA API error for {case_number}: {damia_result['error']}, falling back to Perplexity")
         else:
-            logger.info(f"Case {case_number} not found in DaMIA, falling back to Perplexity + Google")
+            logger.info(f"Case {case_number} not found in DaMIA, falling back to Perplexity")
 
-        # Параллельно запускаем проверку через Perplexity и Google
-        perplexity_task = verify_with_perplexity(case_number)
-        google_task = verify_case_with_google(case_number)
+        # Проверяем через Perplexity
+        try:
+            perplexity_result = await verify_with_perplexity(case_number)
+        except Exception as e:
+            perplexity_result = {"error": str(e), "exists": False}
 
-        perplexity_result, google_result = await asyncio.gather(
-            perplexity_task,
-            google_task,
-            return_exceptions=True
-        )
+        # Определяем статус на основе Perplexity
+        perplexity_exists = perplexity_result.get("exists", False)
+        perplexity_confidence = perplexity_result.get("confidence", "low")
 
-        # Обрабатываем результаты Perplexity
-        perplexity_verification = {}
-        if isinstance(perplexity_result, Exception):
-            perplexity_verification = {"error": str(perplexity_result)}
+        if perplexity_exists and perplexity_confidence in ["high", "medium"]:
+            status = "VERIFIED"
+        elif perplexity_exists:
+            status = "LIKELY_EXISTS"
         else:
-            perplexity_verification = perplexity_result
-
-        # Обрабатываем результаты Google
-        google_verification = {}
-        if isinstance(google_result, Exception):
-            google_verification = {"error": str(google_result), "exists": False}
-        else:
-            google_verification = google_result
-
-        # Комбинируем результаты для определения статуса
-        combined_status, combined_verification = combine_verification_results(
-            perplexity_verification,
-            google_verification,
-            case_number
-        )
-
-        # Добавляем информацию о DaMIA проверке
-        combined_verification["damia_checked"] = True
-        combined_verification["damia_error"] = damia_result.get("error")
+            status = "NOT_FOUND"
 
         verified_cases.append({
             **case,
-            "status": combined_status,
-            "verification_source": "perplexity_google",
-            "verification": combined_verification
+            "status": status,
+            "verification_source": "perplexity",
+            "verification": {
+                "exists": perplexity_exists,
+                "confidence": perplexity_confidence,
+                "sources": perplexity_result.get("sources", []),
+                "actual_info": perplexity_result.get("actual_info", ""),
+                "damia_checked": True,
+                "damia_error": damia_result.get("error")
+            }
         })
 
     return verified_cases
@@ -390,67 +378,6 @@ async def verify_with_perplexity(case_number: str) -> Dict:
 
     except Exception as e:
         return {"error": str(e), "exists": False}
-
-
-def combine_verification_results(
-    perplexity: Dict,
-    google: Dict,
-    case_number: str
-) -> tuple:
-    """
-    Комбинирует результаты верификации из двух источников
-
-    Логика:
-    - Если оба источника подтверждают (high confidence) -> VERIFIED
-    - Если хотя бы один подтверждает с high -> VERIFIED
-    - Если хотя бы один подтверждает -> LIKELY_EXISTS
-    - Если ничего не найдено -> NOT_FOUND
-    """
-    perplexity_exists = perplexity.get("exists", False)
-    perplexity_confidence = perplexity.get("confidence", "low")
-
-    google_exists = google.get("exists", False)
-    google_confidence = google.get("confidence", "low")
-
-    # Собираем все источники
-    all_sources = []
-    all_links = []
-
-    if perplexity.get("sources"):
-        all_sources.extend(perplexity["sources"])
-    if google.get("sources"):
-        all_sources.extend(google["sources"])
-    if google.get("links"):
-        all_links.extend(google["links"])
-
-    # Определяем статус
-    status = "NOT_FOUND"
-
-    if (perplexity_exists and perplexity_confidence == "high") or \
-       (google_exists and google_confidence == "high"):
-        status = "VERIFIED"
-    elif (perplexity_exists and perplexity_confidence == "medium") or \
-         (google_exists and google_confidence == "medium"):
-        status = "VERIFIED"
-    elif perplexity_exists or google_exists:
-        status = "LIKELY_EXISTS"
-
-    # Формируем комбинированный результат
-    combined = {
-        "exists": perplexity_exists or google_exists,
-        "confidence": "high" if status == "VERIFIED" else ("medium" if status == "LIKELY_EXISTS" else "low"),
-        "sources": list(set(all_sources)),  # Убираем дубликаты
-        "links": all_links,
-        "perplexity_result": perplexity,
-        "google_result": google,
-        "actual_info": perplexity.get("actual_info", "")
-    }
-
-    # Добавляем сниппеты из Google если есть
-    if google.get("snippets"):
-        combined["snippets"] = google["snippets"]
-
-    return status, combined
 
 
 async def stage_4_peer_review(
