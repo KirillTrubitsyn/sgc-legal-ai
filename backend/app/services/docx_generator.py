@@ -52,18 +52,8 @@ def create_response_docx(
     title_run.font.size = Pt(14)
     title_run.font.name = 'Times New Roman'
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.paragraph_format.space_after = Pt(2)
+    title.paragraph_format.space_after = Pt(8)
     title.paragraph_format.space_before = Pt(0)
-
-    # Subtitle - topic from question
-    subject = _extract_subject(question)
-    subtitle = doc.add_paragraph()
-    subtitle_run = subtitle.add_run(f"О {subject}")
-    subtitle_run.font.size = Pt(11)
-    subtitle_run.font.name = 'Times New Roman'
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle.paragraph_format.space_after = Pt(6)
-    subtitle.paragraph_format.space_before = Pt(0)
 
     # Extract sources from text and clean answer
     clean_answer, sources = _extract_sources(answer)
@@ -174,31 +164,6 @@ def _add_footer(doc: Document, model: Optional[str], created_at: Optional[dateti
     disclaimer_run.italic = True
     disclaimer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     disclaimer.paragraph_format.space_before = Pt(0)
-
-
-def _extract_subject(question: str) -> str:
-    """Extract subject from question for subtitle"""
-    subject = question.strip()
-
-    # Убираем типичные вводные фразы
-    intro_patterns = [
-        r'^(сделай|подготовь|составь|напиши|создай)\s+(аналитическую\s+)?(справку|обзор|анализ|заключение)\s+(по|о|об|на тему)\s*',
-        r'^(проанализируй|разъясни|объясни|расскажи)\s+(про|о|об)?\s*',
-        r'^(как|что|какие|каковы|почему|зачем|где|когда|кто)\s+',
-    ]
-
-    for pattern in intro_patterns:
-        subject = re.sub(pattern, '', subject, flags=re.IGNORECASE)
-
-    subject = subject.rstrip('?').strip()
-
-    if len(subject) > 80:
-        subject = subject[:77] + "..."
-
-    if subject:
-        subject = subject[0].lower() + subject[1:]
-
-    return subject
 
 
 def _format_model_name(model: str) -> str:
