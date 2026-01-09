@@ -1,5 +1,6 @@
 """
 Query router for Single Query mode
+С автоматическим обогащением ответов через Perplexity Search
 """
 from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import StreamingResponse, Response
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 import json
+import asyncio
 
 from app.database import (
     validate_session,
@@ -23,7 +25,7 @@ from app.services.openrouter import (
     chat_completion_stream
 )
 from app.services.docx_generator import create_response_docx
-from app.services.web_search import web_search_stream
+from app.services.web_search import web_search_stream, web_search
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -56,6 +58,40 @@ LEGAL_SYSTEM_PROMPT = """Ты — юридический AI-ассистент �
 - Если не уверен в актуальности информации — честно укажи это
 
 Отвечай на русском языке, структурированно и профессионально."""
+
+
+# Промпт для поиска судебной практики
+SEARCH_ENRICHMENT_PROMPT = """Найди актуальную судебную практику и законодательство РФ по теме запроса.
+
+Приоритетные источники:
+- kad.arbitr.ru - Картотека арбитражных дел
+- sudact.ru - Судебные акты РФ
+- vsrf.ru - Верховный Суд РФ
+- consultant.ru - КонсультантПлюс
+- garant.ru - Гарант
+- pravo.gov.ru - Официальный портал правовой информации
+
+Для каждого найденного дела укажи:
+- Номер дела
+- Суд и дата решения
+- Краткую суть позиции
+
+Также укажи релевантные статьи законов и кодексов РФ."""
+
+
+async def enrich_with_search(query: str) -> Optional[str]:
+    """
+    Обогащает запрос результатами поиска через Perplexity.
+    Возвращает найденную судебную практику и законодательство.
+    """
+    try:
+        search_query = f"{query}\n\n{SEARCH_ENRICHMENT_PROMPT}"
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: web_search(search_query, ""))
+        return result.get("content", "")
+    except Exception as e:
+        print(f"Search enrichment failed: {e}")
+        return None
 
 
 class Message(BaseModel):
@@ -103,19 +139,36 @@ async def single_query(
     request: QueryRequest,
     authorization: str = Header(None)
 ):
-    """Execute single query to selected model with legal context"""
+    """Execute single query with automatic search enrichment via Perplexity"""
     session = get_session_from_token(authorization)
     user_id = session["user_id"]
 
-    # Convert messages to dict format with system prompt
-    messages = [{"role": "system", "content": LEGAL_SYSTEM_PROMPT}]
-    messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
-
-    # Save user message (last one in the list)
+    # Get user's question
     user_messages = [m for m in request.messages if m.role == "user"]
-    if user_messages:
-        last_user_msg = user_messages[-1]
-        save_chat_message(user_id, "user", last_user_msg.content, request.model)
+    user_query = user_messages[-1].content if user_messages else ""
+
+    # Save user message
+    if user_query:
+        save_chat_message(user_id, "user", user_query, request.model)
+
+    # Enrich with search results from Perplexity (async)
+    search_context = await enrich_with_search(user_query)
+
+    # Build system prompt with search enrichment
+    if search_context:
+        enriched_system_prompt = f"""{LEGAL_SYSTEM_PROMPT}
+
+РЕЗУЛЬТАТЫ ПОИСКА ПО ТЕМЕ ВОПРОСА:
+{search_context}
+
+ВАЖНО: Используй найденную выше судебную практику и ссылки на законодательство в своём ответе.
+Указывай номера дел точно так, как они найдены в поиске. Не выдумывай номера дел."""
+    else:
+        enriched_system_prompt = LEGAL_SYSTEM_PROMPT
+
+    # Convert messages to dict format with enriched system prompt
+    messages = [{"role": "system", "content": enriched_system_prompt}]
+    messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
 
     if request.stream:
         # Streaming response
