@@ -33,7 +33,7 @@ export default function ChatMessage({ role, content, onSave, question, model, to
   };
 
   const handleDownload = async () => {
-    if (downloading) return;
+    if (downloading || !token) return;
     // Используем content как вопрос если question не передан
     const questionText = question || "Юридический запрос";
     setDownloading(true);
