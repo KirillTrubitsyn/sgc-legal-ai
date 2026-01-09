@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="120"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="120"><svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Открытая книга -->
+  <path d="M60 25 L20 35 L20 95 L60 85 L100 95 L100 35 Z" fill="#1e3a5f" stroke="#f7941d" stroke-width="2"></path>
+  <!-- Корешок книги -->
+  <line x1="60" y1="25" x2="60" y2="85" stroke="#f7941d" stroke-width="2"></line>
+  <!-- Нейронные связи -->
+  <g stroke="#f7941d" stroke-width="1.5" opacity="0.9">
+    <circle cx="40" cy="50" r="4" fill="#f7941d"></circle>
+    <circle cx="80" cy="50" r="4" fill="#f7941d"></circle>
+    <circle cx="40" cy="70" r="4" fill="#f7941d"></circle>
+    <circle cx="80" cy="70" r="4" fill="#f7941d"></circle>
+    <circle cx="60" cy="55" r="5" fill="#ffffff"></circle>
+    <line x1="40" y1="50" x2="55" y2="55"></line>
+    <line x1="80" y1="50" x2="65" y2="55"></line>
+    <line x1="40" y1="70" x2="55" y2="55"></line>
+    <line x1="80" y1="70" x2="65" y2="55"></line>
+  </g>
+  <!-- Текст -->
+  <text x="60" y="110" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600" font-family="system-ui, sans-serif">
+    LEGAL AI
+  </text>
+</svg></svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
+@media (prefers-color-scheme: dark) { :root { filter: none; } }
+</style></svg>
