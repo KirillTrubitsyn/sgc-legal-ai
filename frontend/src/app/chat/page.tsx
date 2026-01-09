@@ -107,38 +107,38 @@ export default function ChatPage() {
     const isContinue = urlParams.get("continue") === "true";
     if (isContinue && !continuedFromSaved) {
       const savedContext = localStorage.getItem("sgc_continue_chat");
-      if (savedContext) {
+      const storedToken = localStorage.getItem("sgc_token");
+      if (savedContext && storedToken) {
         try {
           const context = JSON.parse(savedContext);
           // Clear the history first for a fresh conversation with context
-          if (token) {
-            clearChatHistory(token).then(() => {
-              // Add the saved Q&A as context
-              const contextMessages: Message[] = [
-                { role: "user", content: context.question },
-                { role: "assistant", content: context.answer },
-              ];
-              setMessages(contextMessages);
-              setContinuedFromSaved(true);
-              // Set the model if available
-              if (context.model && models.length > 0) {
-                const modelExists = models.some(m => m.id === context.model);
-                if (modelExists) {
-                  setSelectedModel(context.model);
-                }
+          clearChatHistory(storedToken).then(() => {
+            // Add the saved Q&A as context
+            const contextMessages: Message[] = [
+              { role: "user", content: context.question },
+              { role: "assistant", content: context.answer },
+            ];
+            setMessages(contextMessages);
+            setContinuedFromSaved(true);
+            // Set the model if available
+            if (context.model && models.length > 0) {
+              const modelExists = models.some(m => m.id === context.model);
+              if (modelExists) {
+                setSelectedModel(context.model);
               }
-            });
-          }
-          // Clean up
-          localStorage.removeItem("sgc_continue_chat");
-          // Remove query param from URL
-          router.replace("/chat");
+            }
+            // Clean up after successful load
+            localStorage.removeItem("sgc_continue_chat");
+            // Remove query param from URL
+            window.history.replaceState({}, "", "/chat");
+          });
         } catch (e) {
           console.error("Failed to parse continue chat context:", e);
+          localStorage.removeItem("sgc_continue_chat");
         }
       }
     }
-  }, [token, models, continuedFromSaved, router]);
+  }, [models, continuedFromSaved]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
