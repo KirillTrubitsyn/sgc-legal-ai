@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     google_cx: str = ""  # Search Engine ID
 
+    # DaMIA API (верификация судебных дел)
+    damia_api_key: str = ""
+
     # LLM Models (renamed from model_ to llm_ to avoid Pydantic v2 namespace conflict)
     llm_chairman: str = "anthropic/claude-opus-4.5"
     llm_expert_1: str = "openai/gpt-5-2"
