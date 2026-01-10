@@ -77,8 +77,11 @@ def chat_completion(
     # Add reasoning/thinking parameters for supported models
     if reasoning_effort:
         if "gpt-5" in model:
-            # GPT-5.x uses reasoning parameter
-            payload["reasoning"] = {"effort": reasoning_effort}
+            # GPT-5.x uses reasoning parameter with enabled flag
+            payload["reasoning"] = {
+                "enabled": True,
+                "effort": reasoning_effort
+            }
         elif "claude-opus" in model:
             # Claude Opus uses extended thinking via budget_tokens
             # Map effort to approximate token budget
