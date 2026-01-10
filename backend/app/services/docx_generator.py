@@ -192,8 +192,20 @@ def _clean_text_for_docx(text: str) -> str:
     # Remove duplicate "АНАЛИТИЧЕСКАЯ СПРАВКА" at the beginning
     text = re.sub(r'^[\s\n]*АНАЛИТИЧЕСКАЯ СПРАВКА[\s\n]*', '', text, flags=re.IGNORECASE)
 
+    # Remove "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ" header
+    text = re.sub(r'^[\s\n]*ПРАВОВОЕ ЗАКЛЮЧЕНИЕ[\s\n]*', '', text, flags=re.IGNORECASE)
+
+    # Remove "Председатель юридического консилиума" and similar signatures
+    text = re.sub(r'^Председатель\s+(юридического\s+)?консилиума.*$', '', text, flags=re.MULTILINE | re.IGNORECASE)
+
+    # Remove "Дата составления заключения" lines
+    text = re.sub(r'^Дата составления заключения.*$', '', text, flags=re.MULTILINE | re.IGNORECASE)
+
     # Remove --- separators
     text = re.sub(r'^---+\s*$', '', text, flags=re.MULTILINE)
+
+    # Remove trailing empty lines
+    text = re.sub(r'\n{3,}', '\n\n', text)
 
     return text.strip()
 
@@ -211,6 +223,21 @@ def _add_formatted_text(doc: Document, text: str):
         stripped = line.strip()
 
         if not stripped:
+            current_para = None
+            in_list = False
+            continue
+
+        # Section headers with letters (A., B., C., D. TITLE)
+        letter_section_match = re.match(r'^([A-ZА-Я])\.\s+(.*)$', stripped)
+        if letter_section_match and len(stripped) < 100:
+            letter, title = letter_section_match.groups()
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(10)
+            p.paragraph_format.space_after = Pt(4)
+            run = p.add_run(stripped)
+            run.bold = True
+            run.font.size = Pt(12)
+            run.font.name = 'Times New Roman'
             current_para = None
             in_list = False
             continue
@@ -237,6 +264,28 @@ def _add_formatted_text(doc: Document, text: str):
             current_para = None
             in_list = False
             continue
+
+        # Subsection headers (short lines starting with capital letter, no period at end)
+        # Examples: "Применимые нормы права", "Анализ правоотношений"
+        if (len(stripped) < 60 and
+            stripped[0].isupper() and
+            not stripped.endswith('.') and
+            not stripped.endswith(':') and
+            not re.match(r'^\d', stripped) and
+            not stripped.startswith(('-', '•', '*'))):
+            # Check if it looks like a heading (mostly letters, no long sentences)
+            words = stripped.split()
+            if len(words) <= 6 and all(not w.endswith(',') for w in words[:-1]):
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(6)
+                p.paragraph_format.space_after = Pt(2)
+                run = p.add_run(stripped)
+                run.bold = True
+                run.font.size = Pt(11)
+                run.font.name = 'Times New Roman'
+                current_para = None
+                in_list = False
+                continue
 
         # Markdown headers (####, ###, ##, #)
         if stripped.startswith('#### '):
