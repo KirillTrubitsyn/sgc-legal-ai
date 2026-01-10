@@ -16,9 +16,6 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     google_cx: str = ""  # Search Engine ID
 
-    # DaMIA API (верификация судебных дел)
-    damia_api_key: str = ""
-
     # LLM Models for Single Query mode
     model_fast: str = "google/gemini-3-flash-preview"
     model_thinking: str = "google/gemini-3-pro-preview"

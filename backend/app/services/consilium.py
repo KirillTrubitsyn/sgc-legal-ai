@@ -8,7 +8,6 @@ from typing import List, Dict, Any, Optional, Callable, Awaitable
 from datetime import datetime
 
 from app.services.openrouter import chat_completion
-from app.services.damia import verify_case_damia
 from app.config import settings
 import logging
 
@@ -246,15 +245,7 @@ async def stage_2_extract_cases(opinions: Dict[str, Any]) -> List[Dict]:
 
 async def stage_3_verify_cases(cases: List[Dict]) -> List[Dict]:
     """
-    Стадия 3: Верификация судебных дел через DaMIA API + Perplexity
-
-    Порядок верификации:
-    1. DaMIA API (приоритетный источник) - прямой доступ к базе арбитражных дел
-    2. Если DaMIA не нашёл или ошибка -> fallback на Perplexity Sonar Pro
-
-    verification_source в результате:
-    - "damia_api" - подтверждено через DaMIA API
-    - "perplexity" - подтверждено через Perplexity (fallback)
+    Стадия 3: Верификация судебных дел через Perplexity Sonar Pro
     """
     if not cases:
         return []
@@ -266,40 +257,11 @@ async def stage_3_verify_cases(cases: List[Dict]) -> List[Dict]:
         if not case_number:
             continue
 
-        # Шаг 1: Проверяем через DaMIA API
-        damia_result = await verify_case_damia(case_number)
-
-        if damia_result.get("exists"):
-            # DaMIA подтвердил существование дела
-            logger.info(f"Case {case_number} verified via DaMIA API")
-
-            case_data = damia_result.get("case_data", {})
-            verified_cases.append({
-                **case,
-                "status": "VERIFIED",
-                "verification_source": "damia_api",
-                "summary": case_data.get("summary", ""),  # Саммари судебного решения
-                "verification": {
-                    "exists": True,
-                    "confidence": "high",
-                    "sources": ["DaMIA API (kad.arbitr.ru)"],
-                    "links": [case_data.get("url")] if case_data.get("url") else [],
-                    "damia_data": case_data,
-                    "actual_info": _format_damia_info(case_data)
-                }
-            })
-            continue
-
-        # Шаг 2: DaMIA не нашёл или ошибка -> fallback на Perplexity
-        if damia_result.get("error"):
-            logger.warning(f"DaMIA API error for {case_number}: {damia_result['error']}, falling back to Perplexity")
-        else:
-            logger.info(f"Case {case_number} not found in DaMIA, falling back to Perplexity")
-
         # Проверяем через Perplexity
         try:
             perplexity_result = await verify_with_perplexity(case_number)
         except Exception as e:
+            logger.error(f"Perplexity verification error for {case_number}: {e}")
             perplexity_result = {"error": str(e), "exists": False}
 
         # Определяем статус на основе Perplexity
@@ -321,33 +283,11 @@ async def stage_3_verify_cases(cases: List[Dict]) -> List[Dict]:
                 "exists": perplexity_exists,
                 "confidence": perplexity_confidence,
                 "sources": perplexity_result.get("sources", []),
-                "actual_info": perplexity_result.get("actual_info", ""),
-                "damia_checked": True,
-                "damia_error": damia_result.get("error")
+                "actual_info": perplexity_result.get("actual_info", "")
             }
         })
 
     return verified_cases
-
-
-def _format_damia_info(case_data: Dict) -> str:
-    """Форматирует информацию из DaMIA для отображения"""
-    if not case_data:
-        return ""
-
-    parts = []
-    if case_data.get("court"):
-        parts.append(f"Суд: {case_data['court']}")
-    if case_data.get("date"):
-        parts.append(f"Дата: {case_data['date']}")
-    if case_data.get("status"):
-        parts.append(f"Статус: {case_data['status']}")
-    if case_data.get("judge"):
-        parts.append(f"Судья: {case_data['judge']}")
-    if case_data.get("amount"):
-        parts.append(f"Сумма: {case_data['amount']}")
-
-    return "; ".join(parts) if parts else ""
 
 
 async def verify_with_perplexity(case_number: str) -> Dict:
