@@ -370,11 +370,6 @@ export default function ChatPage() {
               <p className="text-xs text-gray-600 mt-4">
                 Поддержка файлов: DOCX, PDF, TXT, изображения (OCR), аудио
               </p>
-              {mode === "consilium" && (
-                <p className="text-xs text-gray-600 mt-1">
-                  ~$0.60 за запрос | 10-20 секунд
-                </p>
-              )}
             </div>
           ) : (
             <>
