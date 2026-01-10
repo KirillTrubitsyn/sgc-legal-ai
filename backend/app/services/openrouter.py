@@ -2,8 +2,12 @@
 OpenRouter API client for SGC Legal AI
 """
 import requests
+import time
+import logging
 from typing import Optional, Generator
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_available_models():
@@ -47,10 +51,11 @@ def chat_completion(
     messages: list,
     stream: bool = False,
     max_tokens: int = 4096,
-    reasoning_effort: str = None
+    reasoning_effort: str = None,
+    max_retries: int = 3
 ) -> dict:
     """
-    Send chat completion request to OpenRouter
+    Send chat completion request to OpenRouter with retry logic
 
     Args:
         model: Model ID (e.g., "openai/gpt-5.2", "anthropic/claude-opus-4.5")
@@ -60,6 +65,7 @@ def chat_completion(
         reasoning_effort: Reasoning effort level ("high", "medium", "low", "xhigh")
                          - For GPT-5.2: enables adaptive reasoning
                          - For Claude Opus 4.5: enables extended thinking
+        max_retries: Maximum number of retry attempts (default 3)
     """
     payload = {
         "model": model,
@@ -85,19 +91,50 @@ def chat_completion(
             budget = thinking_budgets.get(reasoning_effort, 10000)
             payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
 
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {settings.openrouter_api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
-            "X-Title": "SGC Legal AI"
-        },
-        json=payload,
-        timeout=300  # Increased timeout for thinking models
-    )
-    response.raise_for_status()
-    return response.json()
+    headers = {
+        "Authorization": f"Bearer {settings.openrouter_api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
+        "X-Title": "SGC Legal AI"
+    }
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=300  # Increased timeout for thinking models
+            )
+
+            # Check for rate limiting or server errors (retry these)
+            if response.status_code in [429, 500, 502, 503, 504]:
+                wait_time = (2 ** attempt) * 2  # 2s, 4s, 8s
+                logger.warning(f"OpenRouter {response.status_code} for {model}, retry {attempt+1}/{max_retries} in {wait_time}s")
+                time.sleep(wait_time)
+                continue
+
+            response.raise_for_status()
+            return response.json()
+
+        except requests.exceptions.Timeout as e:
+            last_error = e
+            wait_time = (2 ** attempt) * 2
+            logger.warning(f"Timeout for {model}, retry {attempt+1}/{max_retries} in {wait_time}s")
+            time.sleep(wait_time)
+        except requests.exceptions.RequestException as e:
+            last_error = e
+            # Don't retry client errors (4xx except 429)
+            if hasattr(e, 'response') and e.response is not None:
+                if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
+                    raise
+            wait_time = (2 ** attempt) * 2
+            logger.warning(f"Request error for {model}: {e}, retry {attempt+1}/{max_retries} in {wait_time}s")
+            time.sleep(wait_time)
+
+    # All retries failed
+    raise Exception(f"Failed to get response from {model} after {max_retries} attempts: {last_error}")
 
 
 def chat_completion_stream(
