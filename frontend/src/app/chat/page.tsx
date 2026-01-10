@@ -296,7 +296,7 @@ export default function ChatPage() {
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-4">
             <img
-              src="/sgc-logo-horizontal.svg"
+              src="/sgc-logo-horizontal.png"
               alt="SGC Legal AI"
               className="h-10"
             />
