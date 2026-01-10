@@ -110,7 +110,12 @@ export async function sendQuery(
             const parsed = JSON.parse(data);
 
             // Handle error
-            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.error) {
+              const errorMsg = typeof parsed.error === 'string'
+                ? parsed.error
+                : JSON.stringify(parsed.error);
+              throw new Error(errorMsg);
+            }
 
             // Handle stage updates (search, extract, verify, generating)
             if (parsed.stage && onStageUpdate) {
