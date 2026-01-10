@@ -138,27 +138,26 @@ def _add_footer(doc: Document, model: Optional[str], created_at: Optional[dateti
     separator.paragraph_format.space_after = Pt(4)
     separator.paragraph_format.space_before = Pt(4)
 
-    # Date and model
+    # Date
     if created_at:
         date_str = created_at.strftime("%d.%m.%Y")
     else:
         date_str = datetime.now().strftime("%d.%m.%Y")
 
     meta_para = doc.add_paragraph()
-    meta_text = f"Дата: {date_str}"
-    if model:
-        meta_text += f" | {_format_model_name(model)}"
-    meta_run = meta_para.add_run(meta_text)
+    meta_run = meta_para.add_run(f"Дата: {date_str}")
     meta_run.font.size = Pt(9)
     meta_run.font.name = 'Times New Roman'
     meta_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     meta_para.paragraph_format.space_after = Pt(2)
 
-    # Disclaimer
+    # Disclaimer with model
     disclaimer = doc.add_paragraph()
-    disclaimer_run = disclaimer.add_run(
-        "Документ подготовлен SGC Legal AI. Носит информационно-справочный характер."
-    )
+    disclaimer_text = "Документ подготовлен SGC Legal AI"
+    if model:
+        disclaimer_text += f" | {_format_model_name(model)}"
+    disclaimer_text += ". Носит информационно-справочный характер."
+    disclaimer_run = disclaimer.add_run(disclaimer_text)
     disclaimer_run.font.size = Pt(8)
     disclaimer_run.font.name = 'Times New Roman'
     disclaimer_run.italic = True
@@ -188,8 +187,22 @@ def _setup_styles(doc: Document):
     style.paragraph_format.space_after = Pt(4)
 
 
+def _clean_text_for_docx(text: str) -> str:
+    """Remove duplicate headers and clean up text before parsing"""
+    # Remove duplicate "АНАЛИТИЧЕСКАЯ СПРАВКА" at the beginning
+    text = re.sub(r'^[\s\n]*АНАЛИТИЧЕСКАЯ СПРАВКА[\s\n]*', '', text, flags=re.IGNORECASE)
+
+    # Remove --- separators
+    text = re.sub(r'^---+\s*$', '', text, flags=re.MULTILINE)
+
+    return text.strip()
+
+
 def _add_formatted_text(doc: Document, text: str):
     """Add text with formatting"""
+    # Clean text first
+    text = _clean_text_for_docx(text)
+
     lines = text.split('\n')
     current_para = None
     in_list = False
@@ -225,8 +238,18 @@ def _add_formatted_text(doc: Document, text: str):
             in_list = False
             continue
 
-        # Markdown headers
-        if stripped.startswith('### '):
+        # Markdown headers (####, ###, ##, #)
+        if stripped.startswith('#### '):
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(4)
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run(stripped[5:])
+            run.bold = True
+            run.font.size = Pt(11)
+            run.font.name = 'Times New Roman'
+            current_para = None
+            continue
+        elif stripped.startswith('### '):
             p = doc.add_paragraph()
             p.paragraph_format.space_before = Pt(4)
             p.paragraph_format.space_after = Pt(2)
@@ -264,12 +287,21 @@ def _add_formatted_text(doc: Document, text: str):
             p.paragraph_format.first_line_indent = Cm(-0.4)
             p.paragraph_format.space_after = Pt(1)
             p.paragraph_format.space_before = Pt(1)
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             bullet_run = p.add_run("• ")
             bullet_run.font.name = 'Times New Roman'
             bullet_run.font.size = Pt(11)
             _add_inline_formatting(p, stripped[2:])
             current_para = None
             in_list = True
+            continue
+
+        # Numbered items in inline lists (e.g., "1. Объекты... 2. Объекты...")
+        # Check if line contains multiple numbered items
+        if re.search(r'\d+\.\s+\*\*[^*]+\*\*:', stripped):
+            _add_numbered_inline_list(doc, stripped)
+            current_para = None
+            in_list = False
             continue
 
         # Regular paragraph
@@ -284,6 +316,38 @@ def _add_formatted_text(doc: Document, text: str):
             current_para.add_run(' ')
 
         _add_plain_text(current_para, stripped)
+
+
+def _add_numbered_inline_list(doc: Document, text: str):
+    """Split inline numbered list into separate lines"""
+    # Pattern to find numbered items like "1. **Something**: text"
+    pattern = r'(\d+\.\s+)'
+    parts = re.split(pattern, text)
+
+    current_text = ""
+    for i, part in enumerate(parts):
+        if re.match(r'^\d+\.\s+$', part):
+            # This is a number prefix, save it
+            if current_text.strip():
+                # Add previous item
+                p = doc.add_paragraph()
+                p.paragraph_format.left_indent = Cm(0.5)
+                p.paragraph_format.space_after = Pt(2)
+                p.paragraph_format.space_before = Pt(2)
+                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                _add_inline_formatting(p, current_text.strip())
+            current_text = part
+        else:
+            current_text += part
+
+    # Add last item
+    if current_text.strip():
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(0.5)
+        p.paragraph_format.space_after = Pt(2)
+        p.paragraph_format.space_before = Pt(2)
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        _add_inline_formatting(p, current_text.strip())
 
 
 def _add_plain_text(paragraph, text: str):
