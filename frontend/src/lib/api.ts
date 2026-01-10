@@ -47,12 +47,25 @@ export interface Message {
   content: string;
 }
 
+// Stage update for single query with court practice integration
+export interface SingleQueryStageUpdate {
+  stage: string;
+  message?: string;
+}
+
+// Result of single query including verified cases
+export interface SingleQueryResult {
+  content: string;
+  verifiedCases: CourtPracticeCase[];
+}
+
 export async function sendQuery(
   token: string,
   model: string,
   messages: Message[],
-  onChunk: (chunk: string) => void
-): Promise<void> {
+  onChunk: (chunk: string) => void,
+  onStageUpdate?: (update: SingleQueryStageUpdate) => void
+): Promise<SingleQueryResult> {
   const res = await fetch(`${API_URL}/api/query/single`, {
     method: "POST",
     headers: {
@@ -72,6 +85,9 @@ export async function sendQuery(
 
   if (!reader) throw new Error("No response body");
 
+  let fullContent = "";
+  let verifiedCases: CourtPracticeCase[] = [];
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -83,13 +99,34 @@ export async function sendQuery(
       for (const line of lines) {
         if (line.startsWith("data: ")) {
           const data = line.slice(6);
-          if (data === "[DONE]") return;
+          if (data === "[DONE]") {
+            return { content: fullContent, verifiedCases };
+          }
 
           try {
             const parsed = JSON.parse(data);
+
+            // Handle error
             if (parsed.error) throw new Error(parsed.error);
+
+            // Handle stage updates (search, extract, verify, generating)
+            if (parsed.stage && onStageUpdate) {
+              onStageUpdate({ stage: parsed.stage, message: parsed.message });
+              continue;
+            }
+
+            // Handle verified_cases at the end
+            if (parsed.verified_cases) {
+              verifiedCases = parsed.verified_cases;
+              continue;
+            }
+
+            // Handle LLM streaming chunks
             const content = parsed.choices?.[0]?.delta?.content;
-            if (content) onChunk(content);
+            if (content) {
+              fullContent += content;
+              onChunk(content);
+            }
           } catch {
             // Skip non-JSON lines
           }
@@ -104,6 +141,8 @@ export async function sendQuery(
     }
     throw err;
   }
+
+  return { content: fullContent, verifiedCases };
 }
 
 // Consilium types and functions
@@ -603,7 +642,7 @@ export async function googleSearch(
   return res.json();
 }
 
-// Court Practice Search types and functions
+// Court Practice Case type (used in Single Query results)
 
 export interface CourtPracticeCase {
   case_number: string;
@@ -621,119 +660,6 @@ export interface CourtPracticeCase {
     actual_info?: string;
     [key: string]: unknown;
   };
-}
-
-export interface CourtPracticeResult {
-  query: string;
-  started_at: string;
-  completed_at?: string;
-  search_result: string;
-  cases: CourtPracticeCase[];
-  verified_cases: CourtPracticeCase[];
-  summary: string;
-}
-
-export interface CourtPracticeStageUpdate {
-  stage: string;
-  message?: string;
-  result?: CourtPracticeResult;
-}
-
-export async function searchCourtPractice(
-  token: string,
-  query: string,
-  onStageUpdate: (update: CourtPracticeStageUpdate) => void
-): Promise<CourtPracticeResult> {
-  const res = await fetch(`${API_URL}/api/query/court-practice`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ query }),
-  });
-
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.detail || "Court practice search failed");
-  }
-
-  const reader = res.body?.getReader();
-  const decoder = new TextDecoder();
-
-  if (!reader) throw new Error("No response body");
-
-  let finalResult: CourtPracticeResult | null = null;
-  let buffer = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") {
-            if (finalResult) return finalResult;
-            throw new Error("No result received");
-          }
-
-          if (!data) continue;
-
-          try {
-            const parsed = JSON.parse(data) as CourtPracticeStageUpdate;
-            onStageUpdate(parsed);
-
-            if (parsed.stage === "complete" && parsed.result) {
-              finalResult = parsed.result;
-            }
-          } catch {
-            console.log("Parse error for court practice update");
-          }
-        }
-      }
-    }
-  } catch (err) {
-    // Handle connection errors (e.g., when app goes to background on mobile)
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    if (errorMessage.includes("Load failed") || errorMessage.includes("network") || errorMessage.includes("abort")) {
-      throw new Error("Соединение прервано. Не сворачивайте приложение во время обработки запроса.");
-    }
-    throw err;
-  }
-
-  // Process remaining buffer
-  if (buffer.trim()) {
-    const lines = buffer.split("\n");
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6).trim();
-        if (data === "[DONE]" && finalResult) return finalResult;
-
-        if (!data) continue;
-
-        try {
-          const parsed = JSON.parse(data) as CourtPracticeStageUpdate;
-          onStageUpdate(parsed);
-
-          if (parsed.stage === "complete" && parsed.result) {
-            finalResult = parsed.result;
-          }
-        } catch {
-          // Skip
-        }
-      }
-    }
-  }
-
-  if (finalResult) return finalResult;
-  throw new Error("Stream ended without result");
 }
 
 // Web Search API functions (Perplexity)

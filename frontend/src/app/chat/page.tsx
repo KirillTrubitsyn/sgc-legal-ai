@@ -6,14 +6,13 @@ import {
   getModels,
   sendQuery,
   runConsilium,
-  searchCourtPractice,
   Model,
   Message,
   ConsiliumResult,
   StageUpdate,
   FileUploadResult,
-  CourtPracticeResult,
-  CourtPracticeStageUpdate,
+  CourtPracticeCase,
+  SingleQueryStageUpdate,
   getChatHistory,
   clearChatHistory,
   saveResponse,
@@ -26,7 +25,7 @@ import ChatInput from "@/components/ChatInput";
 import ConsiliumProgress from "@/components/ConsiliumProgress";
 import ConsiliumResultComponent from "@/components/ConsiliumResult";
 import CourtPracticeProgress from "@/components/CourtPracticeProgress";
-import CourtPracticeResultComponent from "@/components/CourtPracticeResult";
+import VerifiedCasesDisplay from "@/components/VerifiedCasesDisplay";
 import FileUpload from "@/components/FileUpload";
 import FilePreview from "@/components/FilePreview";
 
@@ -37,12 +36,14 @@ interface ConsiliumMessage {
   result: ConsiliumResult;
 }
 
-interface CourtPracticeMessage {
-  type: "court_practice";
-  result: CourtPracticeResult;
+// Single query result with verified cases
+interface SingleResultMessage {
+  type: "single_result";
+  content: string;
+  verifiedCases: CourtPracticeCase[];
 }
 
-type ChatItem = Message | ConsiliumMessage | CourtPracticeMessage;
+type ChatItem = Message | ConsiliumMessage | SingleResultMessage;
 
 export default function ChatPage() {
   const [userName, setUserName] = useState("");
@@ -55,8 +56,9 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState("");
   const [consiliumStage, setConsiliumStage] = useState("");
   const [consiliumMessage, setConsiliumMessage] = useState("");
-  const [courtPracticeStage, setCourtPracticeStage] = useState("");
-  const [courtPracticeMessage, setCourtPracticeMessage] = useState("");
+  // Single mode stage progress (for court practice search integration)
+  const [singleQueryStage, setSingleQueryStage] = useState("");
+  const [singleQueryMessage, setSingleQueryMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
   const [pendingText, setPendingText] = useState("");
   const [continuedFromSaved, setContinuedFromSaved] = useState(false);
@@ -142,7 +144,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, consiliumStage, courtPracticeStage]);
+  }, [messages, streamingContent, consiliumStage, singleQueryStage]);
 
   const handleLogout = () => {
     localStorage.removeItem("sgc_token");
@@ -177,29 +179,56 @@ export default function ChatPage() {
     setPendingText("");
 
     if (mode === "single") {
-      // Single Query mode - ответы автоматически обогащаются через Perplexity на бэкенде
+      // Single Query mode с интегрированным поиском и верификацией судебной практики
       if (!selectedModel) return;
       setStreamingContent("");
+      setSingleQueryStage("");
+      setSingleQueryMessage("");
 
       try {
-        let fullResponse = "";
-
         const allMessages = [
-          ...messages.filter((m): m is Message => "role" in m),
+          ...messages.filter((m): m is Message => "role" in m && !("type" in m)),
           { role: "user" as const, content: fullContent },
         ];
 
-        await sendQuery(token, selectedModel, allMessages, (chunk) => {
-          fullResponse += chunk;
-          setStreamingContent(fullResponse);
-        });
+        const result = await sendQuery(
+          token,
+          selectedModel,
+          allMessages,
+          (chunk) => {
+            setStreamingContent((prev) => prev + chunk);
+          },
+          (update: SingleQueryStageUpdate) => {
+            setSingleQueryStage(update.stage);
+            setSingleQueryMessage(update.message || "");
+          }
+        );
 
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: fullResponse },
-        ]);
+        setSingleQueryStage("");
+        setSingleQueryMessage("");
         setStreamingContent("");
+
+        // Если есть верифицированные дела, показываем результат с делами
+        if (result.verifiedCases && result.verifiedCases.length > 0) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "single_result",
+              content: result.content,
+              verifiedCases: result.verifiedCases,
+            },
+          ]);
+        } else {
+          // Если дел нет, показываем как обычное сообщение
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: result.content },
+          ]);
+        }
       } catch (err: unknown) {
+        setSingleQueryStage("");
+        setSingleQueryMessage("");
+        setStreamingContent("");
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         setMessages((prev) => [
           ...prev,
@@ -245,48 +274,6 @@ export default function ChatPage() {
     setIsLoading(false);
   };
 
-  const handleCourtPracticeSearch = async (query: string) => {
-    if (isLoading || !query.trim()) return;
-
-    const userMessage: Message = { role: "user", content: `[Поиск судебной практики] ${query}` };
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-    setPendingText("");
-    setCourtPracticeStage("search");
-    setCourtPracticeMessage("Начинаю поиск...");
-
-    try {
-      const result = await searchCourtPractice(
-        token,
-        query,
-        (update: CourtPracticeStageUpdate) => {
-          if (update.stage === "error") {
-            setCourtPracticeStage("");
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", content: `Ошибка: ${update.message}` },
-            ]);
-            return;
-          }
-          setCourtPracticeStage(update.stage);
-          setCourtPracticeMessage(update.message || "");
-        }
-      );
-
-      setMessages((prev) => [...prev, { type: "court_practice", result }]);
-      setCourtPracticeStage("");
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setCourtPracticeStage("");
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Ошибка поиска: ${errorMessage}` },
-      ]);
-    }
-
-    setIsLoading(false);
-  };
-
   const handleNewChat = async () => {
     // Clear history in database
     if (token) {
@@ -295,7 +282,8 @@ export default function ChatPage() {
     setMessages([]);
     setStreamingContent("");
     setConsiliumStage("");
-    setCourtPracticeStage("");
+    setSingleQueryStage("");
+    setSingleQueryMessage("");
     setUploadedFile(null);
     setPendingText("");
   };
@@ -304,8 +292,8 @@ export default function ChatPage() {
     return "type" in item && item.type === "consilium";
   };
 
-  const isCourtPracticeMessage = (item: ChatItem): item is CourtPracticeMessage => {
-    return "type" in item && item.type === "court_practice";
+  const isSingleResultMessage = (item: ChatItem): item is SingleResultMessage => {
+    return "type" in item && item.type === "single_result";
   };
 
   return (
@@ -367,7 +355,7 @@ export default function ChatPage() {
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto">
-          {messages.length === 0 && !streamingContent && !consiliumStage && !uploadedFile ? (
+          {messages.length === 0 && !streamingContent && !consiliumStage && !singleQueryStage && !uploadedFile ? (
             <div className="text-center text-gray-500 mt-20">
               <p className="text-lg mb-2">
                 {mode === "single"
@@ -376,7 +364,7 @@ export default function ChatPage() {
               </p>
               <p className="text-sm">
                 {mode === "single"
-                  ? "Ответы автоматически обогащаются ссылками на судебную практику"
+                  ? "Ответы с верифицированной судебной практикой через DaMIA"
                   : "4 модели проанализируют вопрос с поиском судебной практики"}
               </p>
               <p className="text-xs text-gray-600 mt-4">
@@ -408,19 +396,46 @@ export default function ChatPage() {
                   );
                 }
 
-                if (isCourtPracticeMessage(item)) {
+                if (isSingleResultMessage(item)) {
+                  // Single query result with verified cases
+                  const getPreviousUserMessage = () => {
+                    for (let i = idx - 1; i >= 0; i--) {
+                      const prev = messages[i];
+                      if (!isConsiliumMessage(prev) && !isSingleResultMessage(prev) && prev.role === "user") {
+                        return prev.content;
+                      }
+                    }
+                    return "";
+                  };
+
                   return (
-                    <div key={idx} className="mb-4">
-                      <CourtPracticeResultComponent result={item.result} />
+                    <div key={idx} className="mb-4 space-y-4">
+                      {/* Main answer */}
+                      <ChatMessage
+                        role="assistant"
+                        content={item.content}
+                        onSave={async () => {
+                          const question = getPreviousUserMessage();
+                          await saveResponse(token, question, item.content, selectedModel);
+                        }}
+                        question={getPreviousUserMessage()}
+                        model={selectedModel}
+                        token={token}
+                      />
+                      {/* Verified cases */}
+                      {item.verifiedCases.length > 0 && (
+                        <VerifiedCasesDisplay cases={item.verifiedCases} />
+                      )}
                     </div>
                   );
                 }
 
+                // Regular message
                 // Find previous user message for saving
                 const getPreviousUserMessage = () => {
                   for (let i = idx - 1; i >= 0; i--) {
                     const prev = messages[i];
-                    if (!isConsiliumMessage(prev) && !isCourtPracticeMessage(prev) && prev.role === "user") {
+                    if (!isConsiliumMessage(prev) && !isSingleResultMessage(prev) && prev.role === "user") {
                       return prev.content;
                     }
                   }
@@ -448,9 +463,9 @@ export default function ChatPage() {
               })}
 
               {/* Loading spinner before response starts */}
-              {isLoading && !streamingContent && !consiliumStage && !courtPracticeStage && (
+              {isLoading && !streamingContent && !consiliumStage && !singleQueryStage && (
                 <LoadingSpinner
-                  message={mode === "single" ? "Анализирую запрос..." : "Запускаю консилиум..."}
+                  message={mode === "single" ? "Подготовка..." : "Запускаю консилиум..."}
                 />
               )}
 
@@ -468,10 +483,10 @@ export default function ChatPage() {
                 />
               )}
 
-              {courtPracticeStage && (
+              {singleQueryStage && (
                 <CourtPracticeProgress
-                  currentStage={courtPracticeStage}
-                  message={courtPracticeMessage}
+                  currentStage={singleQueryStage}
+                  message={singleQueryMessage}
                 />
               )}
 
@@ -493,7 +508,6 @@ export default function ChatPage() {
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
-                onSearchCourtPractice={mode === "single" ? handleCourtPracticeSearch : undefined}
                 disabled={isLoading || (mode === "single" && !selectedModel)}
                 initialValue={pendingText}
                 placeholder={
