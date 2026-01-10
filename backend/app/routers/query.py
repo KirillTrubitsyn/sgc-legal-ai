@@ -170,6 +170,8 @@ async def single_query(
 
     # Select model based on mode
     model = settings.model_fast if request.mode == QueryMode.fast else settings.model_thinking
+    # Thinking mode needs more tokens for detailed responses
+    max_tokens = 8192 if request.mode == QueryMode.thinking else 4096
 
     # Save user message
     if user_query:
@@ -205,7 +207,7 @@ async def single_query(
             messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
 
             # Stream response from LLM
-            for chunk in chat_completion_stream(model, messages):
+            for chunk in chat_completion_stream(model, messages, max_tokens=max_tokens):
                 yield f"data: {chunk}\n\n"
                 try:
                     parsed = json.loads(chunk)

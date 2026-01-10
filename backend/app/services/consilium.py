@@ -183,7 +183,7 @@ async def get_model_opinion(model_id: str, messages: List[Dict]) -> Dict:
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(
         None,
-        lambda: chat_completion(model_id, messages, stream=False, max_tokens=4096)
+        lambda: chat_completion(model_id, messages, stream=False, max_tokens=8192)
     )
     content = response["choices"][0]["message"]["content"]
     tokens = response.get("usage", {}).get("total_tokens", 0)
@@ -459,7 +459,7 @@ async def stage_5_final_synthesis(
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: chat_completion(CONSILIUM_MODELS["chairman"], messages, stream=False, max_tokens=4096)
+            lambda: chat_completion(CONSILIUM_MODELS["chairman"], messages, stream=False, max_tokens=8192)
         )
         raw_content = response["choices"][0]["message"]["content"]
         # Очищаем маркдаун из ответа
