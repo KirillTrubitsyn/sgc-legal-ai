@@ -233,14 +233,22 @@ export default function ChatPage() {
             // Handle error/timeout stages
             if (update.stage === "error" || update.stage === "timeout") {
               setConsiliumStage("");
+              // Ensure message is always a string
+              const errorMsg = typeof update.message === 'string'
+                ? update.message
+                : (update.message ? JSON.stringify(update.message) : 'Неизвестная ошибка');
               setMessages((prev) => [
                 ...prev,
-                { role: "assistant", content: `Ошибка: ${update.message}` },
+                { role: "assistant", content: `Ошибка: ${errorMsg}` },
               ]);
               return;
             }
             setConsiliumStage(update.stage);
-            setConsiliumMessage(update.message || "");
+            // Ensure message is always a string
+            const stageMsg = typeof update.message === 'string'
+              ? update.message
+              : (update.message ? JSON.stringify(update.message) : '');
+            setConsiliumMessage(stageMsg);
           }
         );
 

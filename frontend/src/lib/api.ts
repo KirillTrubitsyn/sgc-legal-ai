@@ -113,13 +113,18 @@ export async function sendQuery(
             if (parsed.error) {
               const errorMsg = typeof parsed.error === 'string'
                 ? parsed.error
-                : JSON.stringify(parsed.error);
+                : (typeof parsed.error === 'object' && parsed.error.message)
+                  ? parsed.error.message
+                  : JSON.stringify(parsed.error);
               throw new Error(errorMsg);
             }
 
             // Handle stage updates (search, extract, verify, generating)
             if (parsed.stage && onStageUpdate) {
-              onStageUpdate({ stage: parsed.stage, message: parsed.message });
+              const stageMessage = typeof parsed.message === 'string'
+                ? parsed.message
+                : (parsed.message ? JSON.stringify(parsed.message) : '');
+              onStageUpdate({ stage: parsed.stage, message: stageMessage });
               continue;
             }
 
@@ -135,7 +140,11 @@ export async function sendQuery(
               fullContent += content;
               onChunk(content);
             }
-          } catch {
+          } catch (parseError) {
+            // Re-throw if it's an actual error (not just JSON parse error)
+            if (parseError instanceof Error && parseError.message && !parseError.message.includes('JSON')) {
+              throw parseError;
+            }
             // Skip non-JSON lines
           }
         }
@@ -270,6 +279,10 @@ export async function runConsilium(
 
           try {
             const parsed = JSON.parse(data) as StageUpdate;
+            // Ensure message is always a string
+            if (parsed.message && typeof parsed.message !== 'string') {
+              parsed.message = JSON.stringify(parsed.message);
+            }
             onStageUpdate(parsed);
 
             if (parsed.stage === "complete" && parsed.result) {
@@ -306,6 +319,10 @@ export async function runConsilium(
 
         try {
           const parsed = JSON.parse(data) as StageUpdate;
+          // Ensure message is always a string
+          if (parsed.message && typeof parsed.message !== 'string') {
+            parsed.message = JSON.stringify(parsed.message);
+          }
           onStageUpdate(parsed);
 
           if (parsed.stage === "complete" && parsed.result) {

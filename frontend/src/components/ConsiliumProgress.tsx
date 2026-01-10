@@ -50,7 +50,7 @@ export default function ConsiliumProgress({ currentStage, message }: Props) {
       </div>
 
       <div className="text-center text-gray-300">
-        <span className="animate-pulse">...</span> {message}
+        <span className="animate-pulse">...</span> {typeof message === 'string' ? message : JSON.stringify(message)}
       </div>
 
       <div className="mt-3 text-xs text-gray-500 text-center">
