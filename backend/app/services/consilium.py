@@ -52,20 +52,20 @@ def clean_markdown(text: str) -> str:
 CONSILIUM_MODELS = {
     # Этап 1: Сбор мнений (все 4 эксперта)
     "chairman": "anthropic/claude-opus-4.5",
-    "expert_1": "openai/gpt-5.2",
+    "expert_1": "openai/gpt-5.2-chat",
     "expert_2": "google/gemini-3-pro-preview",
     "expert_3": "perplexity/sonar-pro-search",
     # Этап 2: Peer Review
-    "reviewer": "anthropic/claude-sonnet-4",
+    "reviewer": "anthropic/claude-sonnet-4.5",
     # Этап 3: Синтез (chairman)
 }
 
 MODEL_NAMES = {
     "anthropic/claude-opus-4.5": "Claude Opus 4.5",
-    "openai/gpt-5.2": "GPT-5.2",
+    "openai/gpt-5.2-chat": "GPT-5.2",
     "google/gemini-3-pro-preview": "Gemini 3 Pro Preview",
     "perplexity/sonar-pro-search": "Perplexity Sonar Pro",
-    "anthropic/claude-sonnet-4": "Claude Sonnet 4"
+    "anthropic/claude-sonnet-4.5": "Claude Sonnet 4.5"
 }
 
 
