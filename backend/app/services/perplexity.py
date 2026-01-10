@@ -70,7 +70,15 @@ def search(query: str, max_tokens: int = 2048) -> str:
         json=payload,
         timeout=60
     )
-    response.raise_for_status()
+
+    # Handle HTTP errors with readable messages
+    if not response.ok:
+        try:
+            error_data = response.json()
+            error_msg = error_data.get("error", {}).get("message", response.text)
+        except:
+            error_msg = response.text or f"HTTP {response.status_code}"
+        raise Exception(f"Search API error: {error_msg}")
 
     data = response.json()
     return data["choices"][0]["message"]["content"]
