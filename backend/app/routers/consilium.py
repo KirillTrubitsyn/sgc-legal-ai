@@ -90,19 +90,29 @@ async def run_consilium_stream(
         asyncio.create_task(run_task())
 
         # Читаем обновления стадий до завершения задачи
-        while True:
+        # Увеличен таймаут до 600s для thinking-моделей (GPT-5.2, Opus 4.5)
+        total_timeout = 600  # 10 минут на весь консилиум
+        heartbeat_interval = 30  # Отправлять heartbeat каждые 30 секунд
+        elapsed = 0
+
+        while elapsed < total_timeout:
             try:
-                update = await asyncio.wait_for(stage_updates.get(), timeout=180)
+                update = await asyncio.wait_for(stage_updates.get(), timeout=heartbeat_interval)
 
                 if update is None:
                     # Task finished
                     break
 
                 yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
+                elapsed = 0  # Reset timeout on activity
 
             except asyncio.TimeoutError:
-                yield f"data: {json.dumps({'stage': 'timeout', 'message': 'Превышено время ожидания (180s)'})}\n\n"
-                break
+                elapsed += heartbeat_interval
+                # Send heartbeat to keep connection alive
+                yield f"data: {json.dumps({'stage': 'heartbeat', 'elapsed': elapsed})}\n\n"
+
+        if elapsed >= total_timeout:
+            yield f"data: {json.dumps({'stage': 'timeout', 'message': f'Превышено время ожидания ({total_timeout}s)'})}\n\n"
 
         # Ждём завершения задачи (должна уже быть завершена)
         try:
