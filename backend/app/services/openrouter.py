@@ -28,6 +28,12 @@ def get_available_models():
             "price_per_1k": 0.008
         },
         {
+            "id": "google/gemini-3-flash-preview",
+            "name": "Gemini 3.0 Flash Preview",
+            "description": "Быстрая модель Google для OCR и транскрибации",
+            "price_per_1k": 0.002
+        },
+        {
             "id": "perplexity/sonar-pro-search",
             "name": "Perplexity Sonar Pro",
             "description": "Модель с поиском в интернете",
