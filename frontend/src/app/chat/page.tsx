@@ -3,10 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getModels,
   sendQuery,
   runConsilium,
-  Model,
   Message,
   ConsiliumResult,
   StageUpdate,
@@ -16,9 +14,11 @@ import {
   getChatHistory,
   clearChatHistory,
   saveResponse,
+  QueryMode,
 } from "@/lib/api";
-import ModelSelector from "@/components/ModelSelector";
 import ModeSelector from "@/components/ModeSelector";
+import ModeToggle from "@/components/ModeToggle";
+import SearchToggle from "@/components/SearchToggle";
 import ChatMessage from "@/components/ChatMessage";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ChatInput from "@/components/ChatInput";
@@ -48,9 +48,9 @@ type ChatItem = Message | ConsiliumMessage | SingleResultMessage;
 export default function ChatPage() {
   const [userName, setUserName] = useState("");
   const [token, setToken] = useState("");
-  const [models, setModels] = useState<Model[]>([]);
-  const [selectedModel, setSelectedModel] = useState("");
   const [mode, setMode] = useState<Mode>("single");
+  const [queryMode, setQueryMode] = useState<QueryMode>("fast");
+  const [searchEnabled, setSearchEnabled] = useState(true);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -76,14 +76,6 @@ export default function ChatPage() {
 
     setToken(storedToken);
     setUserName(user || "Пользователь");
-
-    // Load models
-    getModels(storedToken)
-      .then((m) => {
-        setModels(m);
-        if (m.length > 0) setSelectedModel(m[0].id);
-      })
-      .catch(console.error);
 
     // Load chat history (only if not continuing from saved)
     const urlParams = new URLSearchParams(window.location.search);
@@ -122,13 +114,6 @@ export default function ChatPage() {
             ];
             setMessages(contextMessages);
             setContinuedFromSaved(true);
-            // Set the model if available
-            if (context.model && models.length > 0) {
-              const modelExists = models.some(m => m.id === context.model);
-              if (modelExists) {
-                setSelectedModel(context.model);
-              }
-            }
             // Clean up after successful load
             localStorage.removeItem("sgc_continue_chat");
             // Remove query param from URL
@@ -140,7 +125,7 @@ export default function ChatPage() {
         }
       }
     }
-  }, [models, continuedFromSaved]);
+  }, [continuedFromSaved]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -179,8 +164,7 @@ export default function ChatPage() {
     setPendingText("");
 
     if (mode === "single") {
-      // Single Query mode с интегрированным поиском и верификацией судебной практики
-      if (!selectedModel) return;
+      // Single Query mode с поиском Perplexity
       setStreamingContent("");
       setSingleQueryStage("");
       setSingleQueryMessage("");
@@ -193,8 +177,9 @@ export default function ChatPage() {
 
         const result = await sendQuery(
           token,
-          selectedModel,
           allMessages,
+          queryMode,
+          searchEnabled,
           (chunk) => {
             setStreamingContent((prev) => prev + chunk);
           },
@@ -328,17 +313,24 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Mode & Model Selector */}
+      {/* Mode & Query Mode Selector */}
       <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <ModeSelector mode={mode} onModeChange={setMode} />
             {mode === "single" && (
-              <ModelSelector
-                models={models}
-                selected={selectedModel}
-                onSelect={setSelectedModel}
-              />
+              <>
+                <ModeToggle
+                  mode={queryMode}
+                  onModeChange={setQueryMode}
+                  disabled={isLoading}
+                />
+                <SearchToggle
+                  enabled={searchEnabled}
+                  onToggle={setSearchEnabled}
+                  disabled={isLoading}
+                />
+              </>
             )}
           </div>
           {messages.length > 0 && (
@@ -359,16 +351,16 @@ export default function ChatPage() {
             <div className="text-center text-gray-500 mt-20">
               <p className="text-lg mb-2">
                 {mode === "single"
-                  ? "Выберите модель и задайте вопрос"
+                  ? "Задайте юридический вопрос"
                   : "Режим Consilium"}
               </p>
               <p className="text-sm">
                 {mode === "single"
-                  ? "Ответы с верифицированной судебной практикой через DaMIA"
+                  ? "⚡ Быстрый — оперативные ответы | 🧠 Думающий — глубокий анализ"
                   : "4 модели проанализируют вопрос с поиском судебной практики"}
               </p>
               <p className="text-xs text-gray-600 mt-4">
-                Поддержка файлов: DOCX, PDF, TXT, изображения (OCR), аудио (транскрибация)
+                Поддержка файлов: DOCX, PDF, TXT, изображения (OCR), аудио
               </p>
               {mode === "consilium" && (
                 <p className="text-xs text-gray-600 mt-1">
@@ -416,10 +408,10 @@ export default function ChatPage() {
                         content={item.content}
                         onSave={async () => {
                           const question = getPreviousUserMessage();
-                          await saveResponse(token, question, item.content, selectedModel);
+                          await saveResponse(token, question, item.content, queryMode);
                         }}
                         question={getPreviousUserMessage()}
-                        model={selectedModel}
+                        model={queryMode}
                         token={token}
                       />
                       {/* Verified cases */}
@@ -445,7 +437,7 @@ export default function ChatPage() {
                 const handleSaveResponse = item.role === "assistant"
                   ? async () => {
                       const question = getPreviousUserMessage();
-                      await saveResponse(token, question, item.content, selectedModel);
+                      await saveResponse(token, question, item.content, queryMode);
                     }
                   : undefined;
 
@@ -456,7 +448,7 @@ export default function ChatPage() {
                     content={item.content}
                     onSave={handleSaveResponse}
                     question={item.role === "assistant" ? getPreviousUserMessage() : undefined}
-                    model={selectedModel}
+                    model={queryMode}
                     token={token}
                   />
                 );
@@ -508,7 +500,7 @@ export default function ChatPage() {
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
-                disabled={isLoading || (mode === "single" && !selectedModel)}
+                disabled={isLoading}
                 initialValue={pendingText}
                 placeholder={
                   uploadedFile
