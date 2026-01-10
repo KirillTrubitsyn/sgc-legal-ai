@@ -77,9 +77,8 @@ def chat_completion(
     # Add reasoning/thinking parameters for supported models
     if reasoning_effort:
         if "gpt-5" in model:
-            # GPT-5.x uses reasoning parameter with enabled flag
+            # GPT-5.x uses reasoning parameter (effort only, no enabled flag)
             payload["reasoning"] = {
-                "enabled": True,
                 "effort": reasoning_effort
             }
             logger.info(f"GPT-5 reasoning enabled: effort={reasoning_effort}, model={model}")

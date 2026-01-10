@@ -252,15 +252,21 @@ async def get_model_opinion(model_id: str, messages: List[Dict]) -> Dict:
 
     # Включаем reasoning для thinking-моделей
     reasoning_effort = None
+    max_tokens = 8192  # По умолчанию для обычных моделей
+
     if "gpt-5" in model_id or "claude-opus" in model_id:
         reasoning_effort = "high"
+        # Для thinking-моделей нужно больше токенов:
+        # high effort = 80% на reasoning, 20% на ответ
+        # 16384 * 0.2 = ~3200 токенов на ответ
+        max_tokens = 16384
 
     response = await loop.run_in_executor(
         None,
         lambda: chat_completion(
             model_id, messages,
             stream=False,
-            max_tokens=8192,
+            max_tokens=max_tokens,
             reasoning_effort=reasoning_effort
         )
     )
