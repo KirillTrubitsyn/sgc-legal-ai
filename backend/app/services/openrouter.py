@@ -96,7 +96,15 @@ def chat_completion_stream(
         stream=True,
         timeout=120
     )
-    response.raise_for_status()
+
+    # Handle HTTP errors with readable messages
+    if not response.ok:
+        try:
+            error_data = response.json()
+            error_msg = error_data.get("error", {}).get("message", response.text)
+        except:
+            error_msg = response.text or f"HTTP {response.status_code}"
+        raise Exception(f"OpenRouter API error: {error_msg}")
 
     for line in response.iter_lines():
         if line:
