@@ -16,26 +16,15 @@ logger = logging.getLogger(__name__)
 
 def clean_markdown(text: str) -> str:
     """
-    Удаляет маркдаун-разметку из текста для чистого отображения.
+    Очищает текст от лишней маркдаун-разметки, сохраняя **bold** и *italic*.
     """
     if not text:
         return text
 
-    # Удаляем заголовки #### ### ## #
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-
-    # Удаляем **bold** и *italic*
-    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-    text = re.sub(r'\*([^*]+)\*', r'\1', text)
-
-    # Удаляем __bold__ и _italic_
-    text = re.sub(r'__([^_]+)__', r'\1', text)
-    text = re.sub(r'_([^_]+)_', r'\1', text)
-
     # Удаляем ``` блоки кода
     text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
 
-    # Удаляем `inline code`
+    # Удаляем `inline code` - заменяем на содержимое
     text = re.sub(r'`([^`]+)`', r'\1', text)
 
     # Удаляем горизонтальные линии
@@ -44,6 +33,8 @@ def clean_markdown(text: str) -> str:
 
     # Удаляем лишние пустые строки
     text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # НЕ удаляем: заголовки (#), **bold**, *italic* - они нужны для форматирования
 
     return text.strip()
 
