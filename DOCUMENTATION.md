@@ -107,7 +107,8 @@ sgc-legal-ai/
 |--------|-----------|-------------------|
 | Claude Opus 4.5 | Anthropic | Chairman, извлечение дел, синтез |
 | GPT 5.2 | OpenAI | Expert 1 в Consilium |
-| Gemini 3 Pro | Google | Expert 2, обработка файлов |
+| Gemini 3 Pro | Google | Expert 2 в Consilium |
+| Gemini 3 Flash | Google | OCR изображений, транскрибация аудио |
 | Sonar Pro | Perplexity | Поиск судебной практики, верификация |
 
 ---
@@ -1163,7 +1164,8 @@ X-Title: SGC Legal AI
 |--------|----|-----------:|-----------------|
 | Claude Opus 4.5 | `anthropic/claude-opus-4.5` | Chairman, синтез | $0.015 |
 | GPT 5.2 | `openai/gpt-5.2` | Expert 1 | $0.010 |
-| Gemini 3 Pro | `google/gemini-3-pro-preview` | Expert 2, файлы | $0.008 |
+| Gemini 3 Pro | `google/gemini-3-pro-preview` | Expert 2 | $0.008 |
+| Gemini 3 Flash | `google/gemini-3-flash-preview` | OCR, транскрибация | $0.001 |
 | Sonar Pro | `perplexity/sonar-pro-search` | Поиск, верификация | $0.003 |
 
 **Пример запроса:**
@@ -1565,8 +1567,8 @@ async def health_ready():
 - Возможность отмены запроса на клиенте
 
 ### 4. Обработка мультимедиа
-- Изображения: OCR через Gemini (multimodal)
-- Аудио: транскрибация через Gemini (до 5 минут)
+- Изображения: OCR через Gemini 3 Flash (multimodal)
+- Аудио: транскрибация через Gemini 3 Flash (до 5 минут)
 - DOCX/PDF: извлечение текста и таблиц
 - Лимит: 25 МБ на файл
 
