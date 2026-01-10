@@ -266,9 +266,9 @@ async def stage_2_peer_review(question: str, opinions: Dict[str, Any], search_re
     - Оценка каждого эксперта по критериям
     - Объединение с результатами поиска Perplexity
     """
-    # Собираем ответы экспертов
+    # Собираем ответы экспертов (полные ответы без ограничения)
     all_opinions = "\n\n".join([
-        f"=== {op['name']} ===\n{op['content'][:3000]}"  # Ограничиваем размер
+        f"=== {op['name']} ===\n{op['content']}"
         for op in opinions.values() if not op.get("error")
     ])
 
@@ -385,7 +385,7 @@ async def stage_3_final_synthesis(
 """
     for op in opinions.values():
         if not op.get("error"):
-            synthesis_prompt += f"\n--- {op['name']} ---\n{op['content'][:2000]}...\n"  # Сокращаем для контекста
+            synthesis_prompt += f"\n--- {op['name']} ---\n{op['content']}\n"
 
     synthesis_prompt += f"""
 

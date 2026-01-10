@@ -82,6 +82,7 @@ def chat_completion(
                 "enabled": True,
                 "effort": reasoning_effort
             }
+            logger.info(f"GPT-5 reasoning enabled: effort={reasoning_effort}, model={model}")
         elif "claude-opus" in model:
             # Claude Opus uses extended thinking via budget_tokens
             # Map effort to approximate token budget
@@ -100,6 +101,10 @@ def chat_completion(
         "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
         "X-Title": "SGC Legal AI"
     }
+
+    # Log payload for debugging (без messages для краткости)
+    debug_payload = {k: v for k, v in payload.items() if k != "messages"}
+    logger.info(f"OpenRouter request: {model} | params: {debug_payload}")
 
     last_error = None
     for attempt in range(max_retries):
