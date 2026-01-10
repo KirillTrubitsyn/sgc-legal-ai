@@ -1,6 +1,6 @@
 """
 Query router for Single Query mode
-С автоматическим обогащением ответов через Perplexity Search
+С интегрированным поиском и верификацией судебной практики
 """
 from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import StreamingResponse, Response
@@ -50,38 +50,33 @@ LEGAL_SYSTEM_PROMPT = """Ты — юридический AI-ассистент �
 Отвечай на русском языке, структурированно и профессионально."""
 
 
-# Промпт для поиска судебной практики
-SEARCH_ENRICHMENT_PROMPT = """Найди актуальную судебную практику и законодательство РФ по теме запроса.
+# Системный промпт с верифицированной судебной практикой
+LEGAL_SYSTEM_PROMPT_WITH_CASES = """Ты — юридический AI-ассистент Сибирской генерирующей компании (СГК).
 
-Приоритетные источники:
-- kad.arbitr.ru - Картотека арбитражных дел
-- sudact.ru - Судебные акты РФ
-- vsrf.ru - Верховный Суд РФ
-- consultant.ru - КонсультантПлюс
-- garant.ru - Гарант
-- pravo.gov.ru - Официальный портал правовой информации
+СТИЛЬ ИЗЛОЖЕНИЯ:
+- Профессиональный юридический язык без эмоциональной окраски
+- Убедительная аргументация через факты и логику
+- Структура параграфа: тезис → аргументация → вывод
+- Ключевые выводы выделяй жирным шрифтом (**вывод**)
+- Сложные вопросы объясняй доступно, избегая излишних канцеляризмов
+- Номера статей и пунктов пиши ТОЛЬКО цифрами (ст. 333 ГК РФ, п. 75)
 
-Для каждого найденного дела укажи:
-- Номер дела
-- Суд и дата решения
-- Краткую суть позиции
+ФОРМАТИРОВАНИЕ:
+- Прямые цитаты из судебных решений или НПА выделяй курсивом (*цитата*)
+- **Ключевые выводы** выделяй жирным
+- Избегай таблиц и сложной markdown-разметки
 
-Также укажи релевантные статьи законов и кодексов РФ."""
+ВЕРИФИЦИРОВАННАЯ СУДЕБНАЯ ПРАКТИКА:
+{verified_cases}
 
+ВАЖНО:
+- Используй в ответе ТОЛЬКО дела со статусом VERIFIED — они проверены через официальные базы
+- Ссылайся на номера дел точно так, как они указаны выше
+- Не выдумывай номера дел — используй только предоставленные
+- Цитируй позиции судов, опираясь на информацию из верифицированных дел
+- Дела со статусом LIKELY_EXISTS можно упоминать с оговоркой о необходимости проверки
 
-async def enrich_with_search(query: str) -> Optional[str]:
-    """
-    Обогащает запрос результатами поиска через Perplexity.
-    Возвращает найденную судебную практику и законодательство.
-    """
-    try:
-        search_query = f"{query}\n\n{SEARCH_ENRICHMENT_PROMPT}"
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, lambda: web_search(search_query, ""))
-        return result.get("content", "")
-    except Exception as e:
-        print(f"Search enrichment failed: {e}")
-        return None
+Отвечай на русском языке, структурированно и профессионально."""
 
 
 class Message(BaseModel):
@@ -124,12 +119,48 @@ async def list_models(authorization: str = Header(None)):
     return {"models": get_available_models()}
 
 
+def format_verified_cases_for_prompt(verified_cases: list) -> str:
+    """Форматирует верифицированные дела для включения в промпт"""
+    if not verified_cases:
+        return "Верифицированных дел не найдено."
+
+    lines = []
+    for case in verified_cases:
+        status = case.get("status", "UNKNOWN")
+        case_num = case.get("case_number", "Без номера")
+        court = case.get("court", "")
+        date = case.get("date", "")
+        summary = case.get("summary", "")
+        actual_info = case.get("verification", {}).get("actual_info", "")
+
+        line = f"- [{status}] {case_num}"
+        if court:
+            line += f" | {court}"
+        if date:
+            line += f" | {date}"
+        if summary:
+            line += f"\n  Позиция: {summary}"
+        if actual_info:
+            line += f"\n  Доп. информация: {actual_info}"
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
 @router.post("/single")
 async def single_query(
     request: QueryRequest,
     authorization: str = Header(None)
 ):
-    """Execute single query with automatic search enrichment via Perplexity"""
+    """
+    Execute single query with integrated court practice search and verification.
+
+    Процесс:
+    1. Поиск судебной практики через Perplexity
+    2. Извлечение номеров дел
+    3. Верификация через DaMIA API
+    4. Генерация ответа с учётом верифицированных дел
+    """
     session = get_session_from_token(authorization)
     user_id = session["user_id"]
 
@@ -141,45 +172,82 @@ async def single_query(
     if user_query:
         save_chat_message(user_id, "user", user_query, request.model)
 
-    # Enrich with search results from Perplexity (async)
-    # Пропускаем обогащение если выбран сам Perplexity — он сам ищет
+    # Пропускаем верификацию если выбран Perplexity — он сам ищет
     is_perplexity = "perplexity" in request.model.lower()
-    search_context = None if is_perplexity else await enrich_with_search(user_query)
-
-    # Build system prompt with search enrichment
-    if search_context:
-        enriched_system_prompt = f"""{LEGAL_SYSTEM_PROMPT}
-
-РЕЗУЛЬТАТЫ ПОИСКА ПО ТЕМЕ ВОПРОСА:
-{search_context}
-
-ВАЖНО: Используй найденную выше судебную практику и ссылки на законодательство в своём ответе.
-Указывай номера дел точно так, как они найдены в поиске. Не выдумывай номера дел."""
-    else:
-        enriched_system_prompt = LEGAL_SYSTEM_PROMPT
-
-    # Convert messages to dict format with enriched system prompt
-    messages = [{"role": "system", "content": enriched_system_prompt}]
-    messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
 
     if request.stream:
-        # Streaming response
         async def generate():
             full_response = ""
+            verified_cases_result = None
+
             try:
+                if not is_perplexity:
+                    # Stage 1-3: Поиск и верификация судебной практики
+                    stage_queue = asyncio.Queue()
+
+                    async def on_stage_update(stage: str, message: str):
+                        await stage_queue.put({"stage": stage, "message": message})
+
+                    # Запускаем поиск судебной практики
+                    search_task = asyncio.create_task(
+                        search_court_practice(user_query, on_stage_update)
+                    )
+
+                    # Отправляем обновления стадий пока идёт поиск
+                    while not search_task.done():
+                        try:
+                            update = await asyncio.wait_for(stage_queue.get(), timeout=0.1)
+                            yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
+                        except asyncio.TimeoutError:
+                            continue
+
+                    # Получаем результат поиска
+                    court_practice_result = await search_task
+
+                    # Отправляем оставшиеся обновления из очереди
+                    while not stage_queue.empty():
+                        update = await stage_queue.get()
+                        yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
+
+                    verified_cases_result = court_practice_result.get("verified_cases", [])
+
+                    # Stage 4: Генерация ответа
+                    yield f"data: {json.dumps({'stage': 'generating', 'message': 'Генерация ответа...'}, ensure_ascii=False)}\n\n"
+
+                    # Формируем системный промпт с верифицированными делами
+                    if verified_cases_result:
+                        cases_text = format_verified_cases_for_prompt(verified_cases_result)
+                        system_prompt = LEGAL_SYSTEM_PROMPT_WITH_CASES.format(verified_cases=cases_text)
+                    else:
+                        system_prompt = LEGAL_SYSTEM_PROMPT
+                else:
+                    # Для Perplexity используем базовый промпт
+                    system_prompt = LEGAL_SYSTEM_PROMPT
+
+                # Формируем сообщения для LLM
+                messages = [{"role": "system", "content": system_prompt}]
+                messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
+
+                # Стримим ответ от LLM
                 for chunk in chat_completion_stream(request.model, messages):
                     yield f"data: {chunk}\n\n"
-                    # Parse chunk to accumulate response
                     try:
                         parsed = json.loads(chunk)
                         delta = parsed.get("choices", [{}])[0].get("delta", {}).get("content", "")
                         full_response += delta
                     except:
                         pass
+
+                # Отправляем верифицированные дела в конце
+                if verified_cases_result:
+                    yield f"data: {json.dumps({'verified_cases': verified_cases_result}, ensure_ascii=False)}\n\n"
+
                 yield "data: [DONE]\n\n"
-                # Save assistant response after streaming completes
+
+                # Сохраняем ответ ассистента
                 if full_response:
                     save_chat_message(user_id, "assistant", full_response, request.model)
+
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
@@ -192,13 +260,15 @@ async def single_query(
             }
         )
     else:
-        # Non-streaming response
+        # Non-streaming response (без верификации для простоты)
         try:
+            messages = [{"role": "system", "content": LEGAL_SYSTEM_PROMPT}]
+            messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
+
             result = chat_completion(request.model, messages, stream=False)
             content = result["choices"][0]["message"]["content"]
             tokens = result.get("usage", {}).get("total_tokens", 0)
 
-            # Save assistant response
             save_chat_message(user_id, "assistant", content, request.model)
 
             return QueryResponse(
@@ -269,77 +339,6 @@ async def web_search_endpoint(
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-
-
-class CourtPracticeRequest(BaseModel):
-    query: str
-
-
-@router.post("/court-practice")
-async def court_practice_search_endpoint(
-    request: CourtPracticeRequest,
-    authorization: str = Header(None)
-):
-    """
-    Search for court practice with DaMIA verification.
-    Returns verified court cases related to the query.
-    """
-    session = get_session_from_token(authorization)
-    user_id = session["user_id"]
-
-    # Save search query to history
-    save_chat_message(user_id, "user", f"[Поиск судебной практики] {request.query}", "court-practice-search")
-
-    # Use queue for stage updates
-    stage_queue = asyncio.Queue()
-
-    async def on_stage_update(stage: str, message: str):
-        await stage_queue.put({"stage": stage, "message": message})
-
-    async def generate():
-        try:
-            # Start search in background
-            search_task = asyncio.create_task(
-                search_court_practice(request.query, on_stage_update)
-            )
-
-            # Stream stage updates while search is running
-            while not search_task.done():
-                try:
-                    update = await asyncio.wait_for(stage_queue.get(), timeout=0.1)
-                    yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
-                except asyncio.TimeoutError:
-                    continue
-
-            # Get final result
-            result = await search_task
-
-            # Drain any remaining updates
-            while not stage_queue.empty():
-                update = await stage_queue.get()
-                yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
-
-            # Send final result
-            yield f"data: {json.dumps({'stage': 'complete', 'result': result}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
-
-            # Save result summary to history
-            if result:
-                verified_count = len([c for c in result.get('verified_cases', []) if c.get('status') == 'VERIFIED'])
-                summary = f"Найдено {verified_count} верифицированных дел по теме: {request.query}"
-                save_chat_message(user_id, "assistant", summary, "court-practice-search")
-
-        except Exception as e:
-            yield f"data: {json.dumps({'stage': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
-    )
 
 
 @router.get("/history")
