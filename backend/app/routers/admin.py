@@ -14,7 +14,6 @@ from app.database import (
     delete_invite_code,
     update_invite_code_uses
 )
-from app.services.damia import verify_case_damia
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 security = HTTPBearer()
@@ -148,35 +147,3 @@ async def update_invite_code(
         raise HTTPException(status_code=500, detail="Не удалось обновить инвайт-код")
 
     return {"success": True}
-
-
-class DamiaTestRequest(BaseModel):
-    case_number: str
-
-
-@router.post("/test-damia")
-async def test_damia_api(
-    request: DamiaTestRequest,
-    token: str = Depends(verify_admin_token)
-):
-    """
-    Тестовый эндпоинт для проверки работы DaMIA API.
-    Проверяет существование судебного дела по номеру.
-
-    Пример номера дела: А40-12345/2024
-    """
-    if not settings.damia_api_key:
-        return {
-            "success": False,
-            "error": "DAMIA_API_KEY не настроен в переменных окружения",
-            "api_configured": False
-        }
-
-    result = await verify_case_damia(request.case_number)
-
-    return {
-        "success": True,
-        "api_configured": True,
-        "case_number": request.case_number,
-        "result": result
-    }
