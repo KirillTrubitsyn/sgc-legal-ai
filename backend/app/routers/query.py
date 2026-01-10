@@ -1,15 +1,16 @@
 """
 Query router for Single Query mode
-С интегрированным поиском и верификацией судебной практики
+Упрощённый режим с двумя моделями (быстрая/думающая) и поиском Perplexity по умолчанию
 """
 from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from enum import Enum
 import json
-import asyncio
 
+from app.config import settings
 from app.database import (
     validate_session,
     save_chat_message,
@@ -19,64 +20,95 @@ from app.database import (
     get_saved_responses,
     delete_saved_response
 )
-from app.services.openrouter import (
-    get_available_models,
-    chat_completion,
-    chat_completion_stream
-)
+from app.services.openrouter import chat_completion_stream
 from app.services.docx_generator import create_response_docx
-from app.services.web_search import web_search_stream, web_search
-from app.services.court_practice_search import search_court_practice
+from app.services import perplexity
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
-# Системный промпт для юридического ассистента SGC (стиль аналитической справки)
-LEGAL_SYSTEM_PROMPT = """Ты — юридический AI-ассистент Сибирской генерирующей компании (СГК).
+
+# Системный промпт БЕЗ поиска
+SYSTEM_PROMPT_BASE = """Ты — юридический AI-ассистент Сибирской генерирующей компании (СГК).
+
+СТРУКТУРА ОТВЕТА:
+Строй ответ как профессиональную аналитическую справку:
+1. Краткий ответ на вопрос (1-2 абзаца)
+2. Правовое обоснование
+3. Практические рекомендации или выводы
 
 СТИЛЬ ИЗЛОЖЕНИЯ:
 - Профессиональный юридический язык без эмоциональной окраски
 - Убедительная аргументация через факты и логику
 - Структура параграфа: тезис → аргументация → вывод
-- Ключевые выводы выделяй жирным шрифтом (**вывод**)
 - Сложные вопросы объясняй доступно, избегая излишних канцеляризмов
 - Номера статей и пунктов пиши ТОЛЬКО цифрами (ст. 333 ГК РФ, п. 75)
 
+ВЫДЕЛЕНИЕ ТЕКСТА:
+- **Ключевые выводы** выделяй жирным (обычно последнее предложение параграфа)
+- **Критические факты и цифры** — жирным
+- **Правовые позиции и нормы** — жирным
+- *Прямые цитаты из судебных решений или НПА* — курсивом
+
+НЕ ВЫДЕЛЯЙ жирным:
+- Обычные факты и описания
+- Названия организаций
+- Даты и номера дел
+
 ФОРМАТИРОВАНИЕ:
-- Прямые цитаты из судебных решений или НПА выделяй курсивом (*цитата*)
-- **Ключевые выводы** выделяй жирным
+- Используй нумерованные списки для последовательных действий
+- Буллеты — для перечисления равнозначных элементов
 - Избегай таблиц и сложной markdown-разметки
-- Если не уверен в актуальности информации — честно укажи это
 
 Отвечай на русском языке, структурированно и профессионально."""
 
 
-# Системный промпт с верифицированной судебной практикой
-LEGAL_SYSTEM_PROMPT_WITH_CASES = """Ты — юридический AI-ассистент Сибирской генерирующей компании (СГК).
+# Системный промпт С поиском (шаблон)
+SYSTEM_PROMPT_WITH_SEARCH = """Ты — юридический AI-ассистент Сибирской генерирующей компании (СГК).
+
+СТРУКТУРА ОТВЕТА:
+Строй ответ как профессиональную аналитическую справку:
+1. Краткий ответ на вопрос (1-2 абзаца)
+2. Правовое обоснование
+3. Практические рекомендации или выводы
 
 СТИЛЬ ИЗЛОЖЕНИЯ:
 - Профессиональный юридический язык без эмоциональной окраски
 - Убедительная аргументация через факты и логику
 - Структура параграфа: тезис → аргументация → вывод
-- Ключевые выводы выделяй жирным шрифтом (**вывод**)
 - Сложные вопросы объясняй доступно, избегая излишних канцеляризмов
 - Номера статей и пунктов пиши ТОЛЬКО цифрами (ст. 333 ГК РФ, п. 75)
 
+АКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ПОИСКА:
+{search_results}
+
+ПРАВИЛА ИСПОЛЬЗОВАНИЯ РЕЗУЛЬТАТОВ ПОИСКА:
+- Ссылайся на найденные судебные дела с указанием номера и сути позиции
+- Указывай источник информации (судебная практика, законодательство)
+- Если информация противоречива — отметь это
+- Свежие изменения законодательства приоритетнее устаревших норм
+
+ВЫДЕЛЕНИЕ ТЕКСТА:
+- **Ключевые выводы** выделяй жирным (обычно последнее предложение параграфа)
+- **Критические факты и цифры** — жирным
+- **Правовые позиции и нормы** — жирным
+- *Прямые цитаты из судебных решений или НПА* — курсивом
+
+НЕ ВЫДЕЛЯЙ жирным:
+- Обычные факты и описания
+- Названия организаций
+- Даты и номера дел
+
 ФОРМАТИРОВАНИЕ:
-- Прямые цитаты из судебных решений или НПА выделяй курсивом (*цитата*)
-- **Ключевые выводы** выделяй жирным
+- Используй нумерованные списки для последовательных действий
+- Буллеты — для перечисления равнозначных элементов
 - Избегай таблиц и сложной markdown-разметки
 
-ВЕРИФИЦИРОВАННАЯ СУДЕБНАЯ ПРАКТИКА:
-{verified_cases}
-
-ВАЖНО:
-- Используй в ответе ТОЛЬКО дела со статусом VERIFIED — они проверены через официальные базы
-- Ссылайся на номера дел точно так, как они указаны выше
-- Не выдумывай номера дел — используй только предоставленные
-- Цитируй позиции судов, опираясь на информацию из верифицированных дел
-- Дела со статусом LIKELY_EXISTS можно упоминать с оговоркой о необходимости проверки
-
 Отвечай на русском языке, структурированно и профессионально."""
+
+
+class QueryMode(str, Enum):
+    fast = "fast"
+    thinking = "thinking"
 
 
 class Message(BaseModel):
@@ -85,17 +117,9 @@ class Message(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    model: str
     messages: List[Message]
-    stream: bool = True
-
-
-class QueryResponse(BaseModel):
-    success: bool
-    content: str = None
-    model: str = None
-    tokens_used: int = None
-    error: str = None
+    mode: QueryMode = QueryMode.fast
+    search_enabled: bool = True
 
 
 def get_session_from_token(authorization: str):
@@ -112,39 +136,16 @@ def get_session_from_token(authorization: str):
     return session
 
 
-@router.get("/models")
-async def list_models(authorization: str = Header(None)):
-    """Get list of available models"""
+@router.get("/modes")
+async def list_modes(authorization: str = Header(None)):
+    """Get available query modes"""
     get_session_from_token(authorization)
-    return {"models": get_available_models()}
-
-
-def format_verified_cases_for_prompt(verified_cases: list) -> str:
-    """Форматирует верифицированные дела для включения в промпт"""
-    if not verified_cases:
-        return "Верифицированных дел не найдено."
-
-    lines = []
-    for case in verified_cases:
-        status = case.get("status", "UNKNOWN")
-        case_num = case.get("case_number", "Без номера")
-        court = case.get("court", "")
-        date = case.get("date", "")
-        summary = case.get("summary", "")
-        actual_info = case.get("verification", {}).get("actual_info", "")
-
-        line = f"- [{status}] {case_num}"
-        if court:
-            line += f" | {court}"
-        if date:
-            line += f" | {date}"
-        if summary:
-            line += f"\n  Позиция: {summary}"
-        if actual_info:
-            line += f"\n  Доп. информация: {actual_info}"
-        lines.append(line)
-
-    return "\n".join(lines)
+    return {
+        "modes": [
+            {"id": "fast", "name": "Быстрый", "icon": "⚡"},
+            {"id": "thinking", "name": "Думающий", "icon": "🧠"}
+        ]
+    }
 
 
 @router.post("/single")
@@ -153,13 +154,12 @@ async def single_query(
     authorization: str = Header(None)
 ):
     """
-    Execute single query with integrated court practice search and verification.
+    Execute single query with optional Perplexity search.
 
-    Процесс:
-    1. Поиск судебной практики через Perplexity
-    2. Извлечение номеров дел
-    3. Верификация через DaMIA API
-    4. Генерация ответа с учётом верифицированных дел
+    Process:
+    1. If search_enabled, run Perplexity search first
+    2. Select model based on mode (fast/thinking)
+    3. Generate response with search context if available
     """
     session = get_session_from_token(authorization)
     user_id = session["user_id"]
@@ -168,177 +168,69 @@ async def single_query(
     user_messages = [m for m in request.messages if m.role == "user"]
     user_query = user_messages[-1].content if user_messages else ""
 
+    # Select model based on mode
+    model = settings.model_fast if request.mode == QueryMode.fast else settings.model_thinking
+
     # Save user message
     if user_query:
-        save_chat_message(user_id, "user", user_query, request.model)
+        save_chat_message(user_id, "user", user_query, model)
 
-    # Пропускаем верификацию если выбран Perplexity — он сам ищет
-    is_perplexity = "perplexity" in request.model.lower()
+    async def generate():
+        full_response = ""
+        search_results = ""
 
-    if request.stream:
-        async def generate():
-            full_response = ""
-            verified_cases_result = None
-
-            try:
-                if not is_perplexity:
-                    # Stage 1-3: Поиск и верификация судебной практики
-                    stage_queue = asyncio.Queue()
-
-                    async def on_stage_update(stage: str, message: str):
-                        await stage_queue.put({"stage": stage, "message": message})
-
-                    # Запускаем поиск судебной практики
-                    search_task = asyncio.create_task(
-                        search_court_practice(user_query, on_stage_update)
-                    )
-
-                    # Отправляем обновления стадий пока идёт поиск
-                    while not search_task.done():
-                        try:
-                            update = await asyncio.wait_for(stage_queue.get(), timeout=0.1)
-                            yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
-                        except asyncio.TimeoutError:
-                            continue
-
-                    # Получаем результат поиска
-                    court_practice_result = await search_task
-
-                    # Отправляем оставшиеся обновления из очереди
-                    while not stage_queue.empty():
-                        update = await stage_queue.get()
-                        yield f"data: {json.dumps(update, ensure_ascii=False)}\n\n"
-
-                    verified_cases_result = court_practice_result.get("verified_cases", [])
-
-                    # Stage 4: Генерация ответа
-                    yield f"data: {json.dumps({'stage': 'generating', 'message': 'Генерация ответа...'}, ensure_ascii=False)}\n\n"
-
-                    # Формируем системный промпт с верифицированными делами
-                    if verified_cases_result:
-                        cases_text = format_verified_cases_for_prompt(verified_cases_result)
-                        system_prompt = LEGAL_SYSTEM_PROMPT_WITH_CASES.format(verified_cases=cases_text)
-                    else:
-                        system_prompt = LEGAL_SYSTEM_PROMPT
-                else:
-                    # Для Perplexity используем базовый промпт
-                    system_prompt = LEGAL_SYSTEM_PROMPT
-
-                # Формируем сообщения для LLM
-                messages = [{"role": "system", "content": system_prompt}]
-                messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
-
-                # Стримим ответ от LLM
-                for chunk in chat_completion_stream(request.model, messages):
-                    yield f"data: {chunk}\n\n"
-                    try:
-                        parsed = json.loads(chunk)
-                        delta = parsed.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                        full_response += delta
-                    except:
-                        pass
-
-                # Отправляем верифицированные дела в конце
-                if verified_cases_result:
-                    yield f"data: {json.dumps({'verified_cases': verified_cases_result}, ensure_ascii=False)}\n\n"
-
-                yield "data: [DONE]\n\n"
-
-                # Сохраняем ответ ассистента
-                if full_response:
-                    save_chat_message(user_id, "assistant", full_response, request.model)
-
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-        return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-            }
-        )
-    else:
-        # Non-streaming response (без верификации для простоты)
         try:
-            messages = [{"role": "system", "content": LEGAL_SYSTEM_PROMPT}]
+            # Stage 1: Search (if enabled)
+            if request.search_enabled and user_query:
+                yield f"data: {json.dumps({'stage': 'search', 'message': 'Поиск актуальной информации...'}, ensure_ascii=False)}\n\n"
+
+                try:
+                    search_results = perplexity.search(user_query)
+                    yield f"data: {json.dumps({'stage': 'search_complete', 'message': 'Поиск завершён'}, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'stage': 'search_error', 'message': f'Ошибка поиска: {str(e)}'}, ensure_ascii=False)}\n\n"
+                    search_results = ""
+
+            # Stage 2: Generate response
+            yield f"data: {json.dumps({'stage': 'generating', 'message': 'Генерация ответа...'}, ensure_ascii=False)}\n\n"
+
+            # Build system prompt
+            if search_results:
+                system_prompt = SYSTEM_PROMPT_WITH_SEARCH.format(search_results=search_results)
+            else:
+                system_prompt = SYSTEM_PROMPT_BASE
+
+            # Build messages for LLM
+            messages = [{"role": "system", "content": system_prompt}]
             messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
 
-            result = chat_completion(request.model, messages, stream=False)
-            content = result["choices"][0]["message"]["content"]
-            tokens = result.get("usage", {}).get("total_tokens", 0)
+            # Stream response from LLM
+            for chunk in chat_completion_stream(model, messages):
+                yield f"data: {chunk}\n\n"
+                try:
+                    parsed = json.loads(chunk)
+                    delta = parsed.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                    full_response += delta
+                except:
+                    pass
 
-            save_chat_message(user_id, "assistant", content, request.model)
+            yield "data: [DONE]\n\n"
 
-            return QueryResponse(
-                success=True,
-                content=content,
-                model=request.model,
-                tokens_used=tokens
-            )
+            # Save assistant response
+            if full_response:
+                save_chat_message(user_id, "assistant", full_response, model)
+
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-
-class SearchRequest(BaseModel):
-    query: str
-    context: Optional[str] = None
-    stream: bool = True
-
-
-@router.post("/search")
-async def web_search_endpoint(
-    request: SearchRequest,
-    authorization: str = Header(None)
-):
-    """Execute web search using Perplexity Sonar Pro"""
-    session = get_session_from_token(authorization)
-    user_id = session["user_id"]
-
-    # Save user search query
-    save_chat_message(user_id, "user", f"[Поиск] {request.query}", "perplexity/sonar-pro-search")
-
-    if request.stream:
-        async def generate():
-            full_response = ""
-            try:
-                for chunk in web_search_stream(request.query, request.context or ""):
-                    yield f"data: {chunk}\n\n"
-                    try:
-                        parsed = json.loads(chunk)
-                        delta = parsed.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                        full_response += delta
-                    except:
-                        pass
-                yield "data: [DONE]\n\n"
-                # Save search result
-                if full_response:
-                    save_chat_message(user_id, "assistant", full_response, "perplexity/sonar-pro-search")
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-        return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-            }
-        )
-    else:
-        from app.services.web_search import web_search
-        try:
-            result = web_search(request.query, request.context or "")
-            save_chat_message(user_id, "assistant", result["content"], "perplexity/sonar-pro-search")
-            return {
-                "success": True,
-                "content": result["content"],
-                "tokens_used": result["tokens"],
-                "model": result["model"]
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.get("/history")
