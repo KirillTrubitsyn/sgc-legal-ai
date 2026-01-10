@@ -1,27 +1,46 @@
-<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Открытая книга -->
-  <path 
-    d="M60 25 L20 35 L20 95 L60 85 L100 95 L100 35 Z" 
-    fill="#1e3a5f"
-    stroke="#f7941d"
-    stroke-width="2"
-  />
-  <!-- Корешок книги -->
-  <line x1="60" y1="25" x2="60" y2="85" stroke="#f7941d" stroke-width="2"/>
-  <!-- Нейронные связи -->
-  <g stroke="#f7941d" stroke-width="1.5" opacity="0.9">
-    <circle cx="40" cy="50" r="4" fill="#f7941d"/>
-    <circle cx="80" cy="50" r="4" fill="#f7941d"/>
-    <circle cx="40" cy="70" r="4" fill="#f7941d"/>
-    <circle cx="80" cy="70" r="4" fill="#f7941d"/>
-    <circle cx="60" cy="55" r="5" fill="#ffffff"/>
-    <line x1="40" y1="50" x2="55" y2="55"/>
-    <line x1="80" y1="50" x2="65" y2="55"/>
-    <line x1="40" y1="70" x2="55" y2="55"/>
-    <line x1="80" y1="70" x2="65" y2="55"/>
+<svg width="120" height="140" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Иконка -->
+  <g transform="translate(28, 10)">
+    <!-- Основа щита/книги -->
+    <g>
+      <!-- Левая верхняя панель (с нейросетью) -->
+      <path d="M0 0 L28 0 L28 28 L0 28 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+
+      <!-- Правая верхняя панель -->
+      <path d="M36 0 L64 0 L64 28 L36 28 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+
+      <!-- Левая нижняя панель -->
+      <path d="M0 36 L28 36 L28 64 L0 64 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+
+      <!-- Правая нижняя панель -->
+      <path d="M36 36 L64 36 L64 64 L36 64 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+    </g>
+
+    <!-- Нейронные связи в левой верхней панели -->
+    <g stroke="#f7941d" stroke-width="1.5">
+      <!-- Центральный узел -->
+      <circle cx="14" cy="14" r="4" fill="#ffffff"/>
+
+      <!-- Внешние узлы -->
+      <circle cx="4" cy="4" r="3" fill="#f7941d"/>
+      <circle cx="24" cy="4" r="3" fill="#f7941d"/>
+      <circle cx="4" cy="24" r="3" fill="#f7941d"/>
+      <circle cx="24" cy="24" r="3" fill="#f7941d"/>
+
+      <!-- Связи -->
+      <line x1="4" y1="4" x2="11" y2="11"/>
+      <line x1="24" y1="4" x2="17" y2="11"/>
+      <line x1="4" y1="24" x2="11" y2="17"/>
+      <line x1="24" y1="24" x2="17" y2="17"/>
+    </g>
+
+    <!-- Золотая рамка -->
+    <rect x="-2" y="-2" width="68" height="68" rx="3" stroke="#f7941d" stroke-width="2" fill="none"/>
   </g>
-  <!-- Текст -->
-  <text x="60" y="110" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600" font-family="system-ui, sans-serif">
-    LEGAL AI
-  </text>
+
+  <!-- Текст SGC -->
+  <text x="60" y="105" text-anchor="middle" fill="#f7941d" font-size="22" font-weight="700" font-family="system-ui, sans-serif">SGC</text>
+
+  <!-- Текст Legal AI -->
+  <text x="60" y="128" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="500" font-family="system-ui, sans-serif">Legal AI</text>
 </svg>

@@ -1,24 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="120"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="120"><svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Открытая книга -->
-  <path d="M60 25 L20 35 L20 95 L60 85 L100 95 L100 35 Z" fill="#1e3a5f" stroke="#f7941d" stroke-width="2"></path>
-  <!-- Корешок книги -->
-  <line x1="60" y1="25" x2="60" y2="85" stroke="#f7941d" stroke-width="2"></line>
-  <!-- Нейронные связи -->
-  <g stroke="#f7941d" stroke-width="1.5" opacity="0.9">
-    <circle cx="40" cy="50" r="4" fill="#f7941d"></circle>
-    <circle cx="80" cy="50" r="4" fill="#f7941d"></circle>
-    <circle cx="40" cy="70" r="4" fill="#f7941d"></circle>
-    <circle cx="80" cy="70" r="4" fill="#f7941d"></circle>
-    <circle cx="60" cy="55" r="5" fill="#ffffff"></circle>
-    <line x1="40" y1="50" x2="55" y2="55"></line>
-    <line x1="80" y1="50" x2="65" y2="55"></line>
-    <line x1="40" y1="70" x2="55" y2="55"></line>
-    <line x1="80" y1="70" x2="65" y2="55"></line>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Основа щита/книги -->
+  <g>
+    <!-- Левая верхняя панель (с нейросетью) -->
+    <path d="M8 8 L30 8 L30 30 L8 30 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+
+    <!-- Правая верхняя панель -->
+    <path d="M34 8 L56 8 L56 30 L34 30 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+
+    <!-- Левая нижняя панель -->
+    <path d="M8 34 L30 34 L30 56 L8 56 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
+
+    <!-- Правая нижняя панель -->
+    <path d="M34 34 L56 34 L56 56 L34 56 Z" fill="#1a2d4a" stroke="#2a4060" stroke-width="0.5"/>
   </g>
-  <!-- Текст -->
-  <text x="60" y="110" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="600" font-family="system-ui, sans-serif">
-    LEGAL AI
-  </text>
-</svg></svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
-@media (prefers-color-scheme: dark) { :root { filter: none; } }
-</style></svg>
+
+  <!-- Нейронные связи в левой верхней панели -->
+  <g stroke="#f7941d" stroke-width="1.5">
+    <!-- Центральный узел -->
+    <circle cx="19" cy="19" r="3.5" fill="#ffffff"/>
+
+    <!-- Внешние узлы -->
+    <circle cx="11" cy="11" r="2.5" fill="#f7941d"/>
+    <circle cx="27" cy="11" r="2.5" fill="#f7941d"/>
+    <circle cx="11" cy="27" r="2.5" fill="#f7941d"/>
+    <circle cx="27" cy="27" r="2.5" fill="#f7941d"/>
+
+    <!-- Связи -->
+    <line x1="11" y1="11" x2="16" y2="16"/>
+    <line x1="27" y1="11" x2="22" y2="16"/>
+    <line x1="11" y1="27" x2="16" y2="22"/>
+    <line x1="27" y1="27" x2="22" y2="22"/>
+  </g>
+
+  <!-- Золотая рамка -->
+  <rect x="6" y="6" width="52" height="52" rx="2" stroke="#f7941d" stroke-width="1.5" fill="none"/>
+</svg>
