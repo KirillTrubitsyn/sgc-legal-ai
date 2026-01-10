@@ -103,12 +103,13 @@ sgc-legal-ai/
 
 ### Языковые модели (LLM)
 
-| Модель | Провайдер | Роль в приложении |
-|--------|-----------|-------------------|
-| Claude Opus 4.5 | Anthropic | Chairman, извлечение дел, синтез |
-| GPT 5.2 | OpenAI | Expert 1 в Consilium |
-| Gemini 3 Pro | Google | Expert 2, обработка файлов |
-| Sonar Pro | Perplexity | Поиск судебной практики, верификация |
+| Модель | Провайдер | ID модели (OpenRouter) | Роль в приложении |
+|--------|-----------|------------------------|-------------------|
+| Claude Opus 4.5 | Anthropic | `anthropic/claude-opus-4.5` | Chairman, извлечение дел, синтез |
+| GPT 5.2 | OpenAI | `openai/gpt-5.2` | Expert 1 в Consilium |
+| Gemini 3 Pro | Google | `google/gemini-3-pro-preview` | Expert 2 в Consilium |
+| Gemini 3 Flash | Google | `google/gemini-3-flash-preview` | OCR изображений, транскрибация аудио |
+| Sonar Pro | Perplexity | `perplexity/sonar-pro-search` | Поиск судебной практики, верификация |
 
 ---
 
@@ -133,6 +134,7 @@ LLM_CHAIRMAN=anthropic/claude-opus-4.5      # Председатель конс�
 LLM_EXPERT_1=openai/gpt-5.2                 # Эксперт 1
 LLM_EXPERT_2=google/gemini-3-pro-preview    # Эксперт 2
 LLM_VERIFICATION=perplexity/sonar-pro       # Верификация
+LLM_FILE_PROCESSOR=google/gemini-3-flash-preview  # OCR и транскрибация
 
 # ═══════════════════════════════════════════════════
 # ВЕРИФИКАЦИЯ СУДЕБНЫХ ДЕЛ
@@ -185,6 +187,7 @@ class Settings(BaseSettings):
     llm_expert_1: str = "openai/gpt-5.2"
     llm_expert_2: str = "google/gemini-3-pro-preview"
     llm_verification: str = "perplexity/sonar-pro"
+    llm_file_processor: str = "google/gemini-3-flash-preview"
 
     # Поиск
     google_api_key: str = ""
@@ -1163,7 +1166,8 @@ X-Title: SGC Legal AI
 |--------|----|-----------:|-----------------|
 | Claude Opus 4.5 | `anthropic/claude-opus-4.5` | Chairman, синтез | $0.015 |
 | GPT 5.2 | `openai/gpt-5.2` | Expert 1 | $0.010 |
-| Gemini 3 Pro | `google/gemini-3-pro-preview` | Expert 2, файлы | $0.008 |
+| Gemini 3 Pro | `google/gemini-3-pro-preview` | Expert 2 | $0.008 |
+| Gemini 3 Flash | `google/gemini-3-flash-preview` | OCR, транскрибация | $0.002 |
 | Sonar Pro | `perplexity/sonar-pro-search` | Поиск, верификация | $0.003 |
 
 **Пример запроса:**
@@ -1491,6 +1495,7 @@ LLM_CHAIRMAN=anthropic/claude-opus-4.5
 LLM_EXPERT_1=openai/gpt-5.2
 LLM_EXPERT_2=google/gemini-3-pro-preview
 LLM_VERIFICATION=perplexity/sonar-pro
+LLM_FILE_PROCESSOR=google/gemini-3-flash-preview
 
 ADMIN_PASSWORD=ADMIN2026
 ALLOWED_ORIGINS=https://yourdomain.com

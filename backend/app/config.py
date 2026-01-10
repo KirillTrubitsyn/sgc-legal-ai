@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     llm_expert_1: str = "openai/gpt-5-2"
     llm_expert_2: str = "google/gemini-3-pro-preview"
     llm_verification: str = "perplexity/sonar-pro"
+    llm_file_processor: str = "google/gemini-3-flash-preview"  # OCR and audio transcription
 
     # File upload
     max_file_size: int = 25 * 1024 * 1024  # 25 MB
