@@ -101,7 +101,14 @@ def chat_completion_stream(
     if not response.ok:
         try:
             error_data = response.json()
-            error_msg = error_data.get("error", {}).get("message", response.text)
+            error_obj = error_data.get("error", {})
+            # Handle both dict format {"error": {"message": "..."}} and string format {"error": "..."}
+            if isinstance(error_obj, dict):
+                error_msg = error_obj.get("message", response.text)
+            elif isinstance(error_obj, str):
+                error_msg = error_obj
+            else:
+                error_msg = response.text
         except:
             error_msg = response.text or f"HTTP {response.status_code}"
         raise Exception(f"OpenRouter API error: {error_msg}")
