@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ConsiliumResult as ConsiliumResultType, saveResponse, exportAsDocx, downloadBlob } from "@/lib/api";
+import MarkdownText from "./MarkdownText";
 
 interface Props {
   result: ConsiliumResultType;
@@ -85,8 +86,8 @@ export default function ConsiliumResult({ result, token }: Props) {
             </div>
           )}
         </div>
-        <div className="text-gray-100 whitespace-pre-wrap">
-          {result.final_answer}
+        <div className="text-gray-100">
+          <MarkdownText content={result.final_answer} />
         </div>
       </div>
 
@@ -139,8 +140,8 @@ export default function ConsiliumResult({ result, token }: Props) {
                 <div className="font-medium text-sgc-orange-500 mb-2">
                   {op.name}
                 </div>
-                <div className="text-sm text-gray-300 whitespace-pre-wrap">
-                  {op.content}
+                <div className="text-sm text-gray-300">
+                  <MarkdownText content={op.content} />
                 </div>
               </div>
             ))}
