@@ -25,21 +25,23 @@ export async function validateToken(token: string) {
   return res.ok;
 }
 
-export interface Model {
-  id: string;
+// Query modes for Single Query
+export type QueryMode = "fast" | "thinking";
+
+export interface Mode {
+  id: QueryMode;
   name: string;
-  description: string;
-  price_per_1k: number;
+  icon: string;
 }
 
-export async function getModels(token: string): Promise<Model[]> {
-  const res = await fetch(`${API_URL}/api/query/models`, {
+export async function getModes(token: string): Promise<Mode[]> {
+  const res = await fetch(`${API_URL}/api/query/modes`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (!res.ok) throw new Error("Failed to fetch models");
+  if (!res.ok) throw new Error("Failed to fetch modes");
   const data = await res.json();
-  return data.models;
+  return data.modes;
 }
 
 export interface Message {
@@ -61,8 +63,9 @@ export interface SingleQueryResult {
 
 export async function sendQuery(
   token: string,
-  model: string,
   messages: Message[],
+  mode: QueryMode = "fast",
+  searchEnabled: boolean = true,
   onChunk: (chunk: string) => void,
   onStageUpdate?: (update: SingleQueryStageUpdate) => void
 ): Promise<SingleQueryResult> {
@@ -72,7 +75,7 @@ export async function sendQuery(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({ messages, mode, search_enabled: searchEnabled }),
   });
 
   if (!res.ok) {

@@ -6,13 +6,16 @@ interface Props {
 }
 
 const STAGES = [
-  { id: "search", name: "Поиск", icon: "1" },
-  { id: "extract", name: "Извлечение", icon: "2" },
-  { id: "verify", name: "Верификация", icon: "3" },
+  { id: "search", name: "Поиск", icon: "🔍" },
+  { id: "search_complete", name: "Найдено", icon: "✅" },
+  { id: "generating", name: "Ответ", icon: "📝" },
 ];
 
 export default function CourtPracticeProgress({ currentStage, message }: Props) {
-  const currentIndex = STAGES.findIndex((s) => s.id === currentStage);
+  // Handle search_error as a variant of search stage
+  const normalizedStage = currentStage === "search_error" ? "search_complete" : currentStage;
+  const currentIndex = STAGES.findIndex((s) => s.id === normalizedStage);
+  const isError = currentStage === "search_error";
 
   return (
     <div className="bg-sgc-blue-700 rounded-xl p-6 mb-4">
@@ -22,7 +25,7 @@ export default function CourtPracticeProgress({ currentStage, message }: Props) 
           <path d="m21 21-4.35-4.35"/>
         </svg>
         <h3 className="text-lg font-semibold text-sgc-orange-500">
-          Поиск судебной практики
+          Обработка запроса
         </h3>
       </div>
 
@@ -37,13 +40,13 @@ export default function CourtPracticeProgress({ currentStage, message }: Props) 
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center text-lg mb-1 ${
                 index < currentIndex
-                  ? "bg-green-600"
+                  ? isError && index === 1 ? "bg-yellow-600" : "bg-green-600"
                   : index === currentIndex
                   ? "bg-sgc-orange-500 animate-pulse"
                   : "bg-sgc-blue-500"
               }`}
             >
-              {index < currentIndex ? "V" : stage.icon}
+              {index < currentIndex ? "✓" : stage.icon}
             </div>
             <span className="text-xs text-center">{stage.name}</span>
           </div>
