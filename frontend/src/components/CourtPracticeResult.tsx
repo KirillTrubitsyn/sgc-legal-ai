@@ -79,9 +79,10 @@ export default function CourtPracticeResult({ result }: Props) {
 
     // 3. Дела Верховного Суда РФ (экономколлегия): 301-ЭС24-609, 306-ЭС24-487
     if (/^\d{2,3}[-–][ЭЕ][СC]\d{2}[-–]\d+$/i.test(normalized)) {
+      // Поиск в Google по сайту consultant.ru (более надёжно чем sudact)
       return {
-        url: `https://sudact.ru/vsrf/doc/?vsrf-txt=${encodeURIComponent(normalized)}`,
-        label: "sudact.ru",
+        url: `https://www.google.com/search?q=${encodeURIComponent(normalized)}+site:consultant.ru+OR+site:garant.ru`,
+        label: "Найти решение",
         color: "purple"
       };
     }
@@ -89,8 +90,8 @@ export default function CourtPracticeResult({ result }: Props) {
     // 4. Дела ВС РФ (ПЭК - Президиум по экономическим спорам): 286-ПЭК24
     if (/^\d{2,3}[-–]П[ЭЕ]К\d{2}$/i.test(normalized)) {
       return {
-        url: `https://sudact.ru/vsrf/doc/?vsrf-txt=${encodeURIComponent(normalized)}`,
-        label: "sudact.ru",
+        url: `https://www.google.com/search?q=${encodeURIComponent(normalized)}+site:consultant.ru+OR+site:garant.ru`,
+        label: "Найти решение",
         color: "purple"
       };
     }
@@ -98,8 +99,8 @@ export default function CourtPracticeResult({ result }: Props) {
     // 5. Кассационные дела СОЮ: 33-21419/2024, 88-1234/2023
     if (/^\d{2}[-–]\d+\/\d{2,4}$/i.test(normalized)) {
       return {
-        url: `https://sudact.ru/search/?q=${encodeURIComponent(normalized)}`,
-        label: "sudact.ru",
+        url: `https://www.google.com/search?q=${encodeURIComponent(normalized)}+судебное+решение`,
+        label: "Найти решение",
         color: "teal"
       };
     }
