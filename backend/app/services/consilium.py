@@ -48,19 +48,24 @@ def clean_markdown(text: str) -> str:
     return text.strip()
 
 
-# Модели консилиума
+# Модели консилиума (3-этапная схема)
 CONSILIUM_MODELS = {
+    # Этап 1: Сбор мнений (все 4 эксперта)
     "chairman": "anthropic/claude-opus-4.5",
     "expert_1": "openai/gpt-5.2",
     "expert_2": "google/gemini-3-pro-preview",
-    "verifier": "perplexity/sonar-pro-search"
+    "expert_3": "perplexity/sonar-pro-search",
+    # Этап 2: Peer Review
+    "reviewer": "anthropic/claude-sonnet-4",
+    # Этап 3: Синтез (chairman)
 }
 
 MODEL_NAMES = {
     "anthropic/claude-opus-4.5": "Claude Opus 4.5",
     "openai/gpt-5.2": "GPT-5.2",
     "google/gemini-3-pro-preview": "Gemini 3 Pro Preview",
-    "perplexity/sonar-pro-search": "Perplexity Sonar Pro"
+    "perplexity/sonar-pro-search": "Perplexity Sonar Pro",
+    "anthropic/claude-sonnet-4": "Claude Sonnet 4"
 }
 
 
@@ -69,7 +74,11 @@ async def run_consilium(
     on_stage_update: Optional[Callable[[str, str], Awaitable[None]]] = None
 ) -> Dict[str, Any]:
     """
-    Запустить полный цикл консилиума
+    Запустить полный цикл консилиума (3-этапная схема)
+
+    Этап 1: Сбор мнений (Opus + GPT 5.2 + Gemini + Perplexity)
+    Этап 2: Peer Review (Claude Sonnet 4) - оценка и извлечение судебных дел
+    Этап 3: Синтез (Claude Opus 4.5) - финальное заключение
     """
     result = {
         "question": question,
@@ -80,42 +89,29 @@ async def run_consilium(
         "total_tokens": 0
     }
 
-    # Стадия 1: Параллельный сбор мнений
+    # Стадия 1: Параллельный сбор мнений от всех 4 экспертов
     if on_stage_update:
         await on_stage_update("stage_1", "Сбор мнений экспертов...")
 
     opinions = await stage_1_gather_opinions(question)
     result["stages"]["stage_1"] = opinions
 
-    # Стадия 2: Извлечение ссылок на судебную практику
+    # Стадия 2: Peer Review (Sonnet 4) - оценка экспертов и извлечение судебных дел
     if on_stage_update:
-        await on_stage_update("stage_2", "Извлечение судебной практики...")
+        await on_stage_update("stage_2", "Анализ и оценка экспертов...")
 
-    cases = await stage_2_extract_cases(opinions)
-    result["stages"]["stage_2"] = cases
+    review_data = await stage_2_peer_review(question, opinions)
+    result["stages"]["stage_2"] = review_data.get("cases", [])
+    result["stages"]["stage_4"] = review_data.get("reviews", {})  # Для совместимости с фронтендом
+    result["verified_cases"] = review_data.get("cases", [])
 
-    # Стадия 3: Верификация судебных дел
+    # Стадия 3: Финальный синтез (Opus 4.5)
     if on_stage_update:
-        await on_stage_update("stage_3", "Верификация судебных дел...")
+        await on_stage_update("stage_3", "Формирование итогового ответа...")
 
-    verified = await stage_3_verify_cases(cases)
-    result["stages"]["stage_3"] = verified
-    result["verified_cases"] = [c for c in verified if c["status"] in ["VERIFIED", "LIKELY_EXISTS"]]
-
-    # Стадия 4: Peer Review
-    if on_stage_update:
-        await on_stage_update("stage_4", "Взаимная оценка экспертов...")
-
-    reviews = await stage_4_peer_review(question, opinions, verified)
-    result["stages"]["stage_4"] = reviews
-
-    # Стадия 5: Финальный синтез
-    if on_stage_update:
-        await on_stage_update("stage_5", "Формирование итогового ответа...")
-
-    final = await stage_5_final_synthesis(question, opinions, verified, reviews)
+    final = await stage_3_final_synthesis(question, opinions, review_data)
     result["final_answer"] = final
-    result["stages"]["stage_5"] = {"synthesis": final}
+    result["stages"]["stage_5"] = {"synthesis": final}  # Для совместимости с фронтендом
 
     result["completed_at"] = datetime.utcnow().isoformat()
 
@@ -124,7 +120,8 @@ async def run_consilium(
 
 async def stage_1_gather_opinions(question: str) -> Dict[str, Any]:
     """
-    Стадия 1: Параллельный запрос ко всем моделям
+    Стадия 1: Параллельный запрос ко всем 4 экспертам
+    (Opus + GPT 5.2 + Gemini + Perplexity)
     """
     system_prompt = """Вы — эксперт-юрист по российскому праву, составляющий правовое заключение академического уровня.
 
@@ -192,16 +189,17 @@ async def stage_1_gather_opinions(question: str) -> Dict[str, Any]:
         {"role": "user", "content": question}
     ]
 
-    # Параллельные запросы
+    # Параллельные запросы ко всем 4 экспертам (исключая reviewer)
+    expert_roles = ["chairman", "expert_1", "expert_2", "expert_3"]
     tasks = []
-    for role, model_id in CONSILIUM_MODELS.items():
-        if role != "verifier":  # Verifier не участвует в первом раунде
-            tasks.append(get_model_opinion(model_id, messages))
+    for role in expert_roles:
+        model_id = CONSILIUM_MODELS[role]
+        tasks.append(get_model_opinion(model_id, messages))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     opinions = {}
-    model_list = [m for r, m in CONSILIUM_MODELS.items() if r != "verifier"]
+    model_list = [CONSILIUM_MODELS[role] for role in expert_roles]
 
     for model_id, res in zip(model_list, results):
         if isinstance(res, Exception):
@@ -224,16 +222,212 @@ async def stage_1_gather_opinions(question: str) -> Dict[str, Any]:
 
 
 async def get_model_opinion(model_id: str, messages: List[Dict]) -> Dict:
-    """Получить ответ от конкретной модели"""
+    """Получить ответ от конкретной модели с поддержкой reasoning"""
     loop = asyncio.get_event_loop()
+
+    # Включаем reasoning для thinking-моделей
+    reasoning_effort = None
+    if "gpt-5" in model_id or "claude-opus" in model_id:
+        reasoning_effort = "high"
+
     response = await loop.run_in_executor(
         None,
-        lambda: chat_completion(model_id, messages, stream=False, max_tokens=8192)
+        lambda: chat_completion(
+            model_id, messages,
+            stream=False,
+            max_tokens=8192,
+            reasoning_effort=reasoning_effort
+        )
     )
     content = response["choices"][0]["message"]["content"]
     tokens = response.get("usage", {}).get("total_tokens", 0)
     return {"content": content, "tokens": tokens}
 
+
+async def stage_2_peer_review(question: str, opinions: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Стадия 2: Peer Review (Claude Sonnet 4)
+    - Оценка каждого эксперта по критериям
+    - Извлечение судебных дел из ответов
+    """
+    # Собираем все ответы
+    all_opinions = "\n\n".join([
+        f"=== {op['name']} ===\n{op['content']}"
+        for op in opinions.values() if not op.get("error")
+    ])
+
+    review_prompt = f"""Проанализируй ответы экспертов на юридический вопрос и выполни ДВЕ задачи:
+
+ВОПРОС: {question}
+
+ОТВЕТЫ ЭКСПЕРТОВ:
+{all_opinions}
+
+ЗАДАЧА 1: Оцени каждый ответ по критериям (1-10):
+1. Правовая точность
+2. Практическая применимость
+3. Качество аргументации
+4. Использование судебной практики
+
+ЗАДАЧА 2: Извлеки ВСЕ упоминания судебных дел из всех ответов.
+
+Ответь СТРОГО в формате JSON:
+{{
+  "reviews": {{
+    "Claude Opus 4.5": {{
+      "legal_accuracy": 8,
+      "practical_value": 7,
+      "argumentation": 8,
+      "case_usage": 7,
+      "total": 7.5,
+      "strengths": ["сильные стороны"],
+      "weaknesses": ["слабые стороны"]
+    }},
+    "GPT-5.2": {{ ... }},
+    "Gemini 3 Pro Preview": {{ ... }},
+    "Perplexity Sonar Pro": {{ ... }}
+  }},
+  "ranking": ["лучший эксперт", "второй", "третий", "четвертый"],
+  "cases": [
+    {{
+      "case_number": "А40-12345/2024",
+      "court": "название суда",
+      "date": "дата если указана",
+      "summary": "краткая суть правовой позиции",
+      "source_model": "какая модель указала это дело",
+      "status": "FROM_EXPERT"
+    }}
+  ]
+}}
+
+Если судебных дел не упомянуто, верни пустой массив cases: []"""
+
+    messages = [{"role": "user", "content": review_prompt}]
+
+    try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: chat_completion(CONSILIUM_MODELS["reviewer"], messages, stream=False, max_tokens=4096)
+        )
+        content = response["choices"][0]["message"]["content"]
+
+        # Парсим JSON из ответа
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            data = json.loads(json_match.group())
+            return {
+                "reviews": data.get("reviews", {}),
+                "ranking": data.get("ranking", []),
+                "cases": data.get("cases", [])
+            }
+    except Exception as e:
+        logger.error(f"Error in peer review: {e}")
+
+    return {"reviews": {}, "ranking": [], "cases": []}
+
+
+async def stage_3_final_synthesis(
+    question: str,
+    opinions: Dict[str, Any],
+    review_data: Dict[str, Any]
+) -> str:
+    """
+    Стадия 3: Финальный синтез (Claude Opus 4.5)
+    """
+    cases = review_data.get("cases", [])
+    reviews = review_data.get("reviews", {})
+    ranking = review_data.get("ranking", [])
+
+    synthesis_prompt = f"""Сформируй ИТОГОВОЕ ПРАВОВОЕ ЗАКЛЮЧЕНИЕ, объединив лучшие элементы ответов экспертов консилиума.
+
+ВОПРОС: {question}
+
+ОТВЕТЫ ЭКСПЕРТОВ:
+"""
+    for op in opinions.values():
+        if not op.get("error"):
+            synthesis_prompt += f"\n=== {op['name']} ===\n{op['content']}\n"
+
+    synthesis_prompt += f"""
+
+РЕЙТИНГ ЭКСПЕРТОВ: {ranking}
+
+СУДЕБНАЯ ПРАКТИКА ИЗ ОТВЕТОВ ЭКСПЕРТОВ:
+"""
+    if cases:
+        for case in cases:
+            synthesis_prompt += f"- {case.get('case_number')}: {case.get('summary', 'N/A')} (источник: {case.get('source_model', 'N/A')})\n"
+    else:
+        synthesis_prompt += "Судебных дел не найдено.\n"
+
+    synthesis_prompt += """
+
+СТРУКТУРА ИТОГОВОГО ЗАКЛЮЧЕНИЯ:
+
+1. **Краткие ответы** — резюме выводов (1–2 абзаца)
+
+2. **Развёрнутый анализ** по разделам A, B, C...:
+   - Заголовок раздела = тезис («Договор подлежит расторжению»)
+   - Теоретическое обоснование (доктрина)
+   - Нормативная база (статьи кодексов)
+   - Судебная практика (из ответов экспертов)
+   - Промежуточный вывод
+
+3. **Итоговые выводы** — практические рекомендации
+
+МЕТОДОЛОГИЯ:
+
+1. Многоуровневая защита каждого тезиса:
+   - Основной аргумент
+   - Субсидиарный («Даже если считать, что..., то...»)
+   - Запасной аргумент
+
+2. При расхождении экспертов:
+   - Изложи обе позиции объективно
+   - Укажи преобладающую точку зрения
+   - Обоснуй выбор итоговой позиции
+
+СТИЛИСТИКА:
+
+- Академический юридический язык
+- Латинские термины курсивом: *pacta sunt servanda*, *lex specialis*
+- Предложения не более 35 слов
+- Номера статей цифрами: ст. 333 ГК РФ
+- **Ключевые выводы** — жирным
+- *Цитаты из судебных актов* — курсивом
+
+ФОРМАТИРОВАНИЕ:
+
+- Иерархическая нумерация: A, B, C → 1, 2, 3
+- Заголовки = тезисы (не темы)
+- НЕ используй таблицы и символы #, ##, ###
+- Буллеты только для перечисления однородных элементов
+
+Дай полное, глубокое правовое заключение академического уровня:"""
+
+    messages = [{"role": "user", "content": synthesis_prompt}]
+
+    try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: chat_completion(
+                CONSILIUM_MODELS["chairman"], messages,
+                stream=False,
+                max_tokens=8192,
+                reasoning_effort="high"  # Extended thinking для финального синтеза
+            )
+        )
+        raw_content = response["choices"][0]["message"]["content"]
+        return clean_markdown(raw_content)
+    except Exception as e:
+        return f"Ошибка синтеза: {str(e)}"
+
+
+# ============================================
+# LEGACY FUNCTIONS (kept for compatibility)
+# ============================================
 
 async def stage_2_extract_cases(opinions: Dict[str, Any]) -> List[Dict]:
     """
