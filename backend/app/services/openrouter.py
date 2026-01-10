@@ -46,11 +46,45 @@ def chat_completion(
     model: str,
     messages: list,
     stream: bool = False,
-    max_tokens: int = 4096
+    max_tokens: int = 4096,
+    reasoning_effort: str = None
 ) -> dict:
     """
     Send chat completion request to OpenRouter
+
+    Args:
+        model: Model ID (e.g., "openai/gpt-5.2", "anthropic/claude-opus-4.5")
+        messages: List of messages
+        stream: Enable streaming
+        max_tokens: Maximum tokens in response
+        reasoning_effort: Reasoning effort level ("high", "medium", "low", "xhigh")
+                         - For GPT-5.2: enables adaptive reasoning
+                         - For Claude Opus 4.5: enables extended thinking
     """
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "stream": stream
+    }
+
+    # Add reasoning/thinking parameters for supported models
+    if reasoning_effort:
+        if "gpt-5" in model:
+            # GPT-5.x uses reasoning parameter
+            payload["reasoning"] = {"effort": reasoning_effort}
+        elif "claude-opus" in model:
+            # Claude Opus uses extended thinking via budget_tokens
+            # Map effort to approximate token budget
+            thinking_budgets = {
+                "low": 2000,
+                "medium": 5000,
+                "high": 10000,
+                "xhigh": 20000
+            }
+            budget = thinking_budgets.get(reasoning_effort, 10000)
+            payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
+
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={
@@ -59,13 +93,8 @@ def chat_completion(
             "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
             "X-Title": "SGC Legal AI"
         },
-        json={
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "stream": stream
-        },
-        timeout=120
+        json=payload,
+        timeout=300  # Increased timeout for thinking models
     )
     response.raise_for_status()
     return response.json()

@@ -222,11 +222,22 @@ async def stage_1_gather_opinions(question: str) -> Dict[str, Any]:
 
 
 async def get_model_opinion(model_id: str, messages: List[Dict]) -> Dict:
-    """Получить ответ от конкретной модели"""
+    """Получить ответ от конкретной модели с поддержкой reasoning"""
     loop = asyncio.get_event_loop()
+
+    # Включаем reasoning для thinking-моделей
+    reasoning_effort = None
+    if "gpt-5" in model_id or "claude-opus" in model_id:
+        reasoning_effort = "high"
+
     response = await loop.run_in_executor(
         None,
-        lambda: chat_completion(model_id, messages, stream=False, max_tokens=8192)
+        lambda: chat_completion(
+            model_id, messages,
+            stream=False,
+            max_tokens=8192,
+            reasoning_effort=reasoning_effort
+        )
     )
     content = response["choices"][0]["message"]["content"]
     tokens = response.get("usage", {}).get("total_tokens", 0)
@@ -401,7 +412,12 @@ async def stage_3_final_synthesis(
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: chat_completion(CONSILIUM_MODELS["chairman"], messages, stream=False, max_tokens=8192)
+            lambda: chat_completion(
+                CONSILIUM_MODELS["chairman"], messages,
+                stream=False,
+                max_tokens=8192,
+                reasoning_effort="high"  # Extended thinking для финального синтеза
+            )
         )
         raw_content = response["choices"][0]["message"]["content"]
         return clean_markdown(raw_content)
