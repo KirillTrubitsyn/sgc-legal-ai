@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # LLM Models for Consilium mode (3-этапная схема)
     model_chairman: str = "anthropic/claude-opus-4.5"      # Этапы 1 и 3
-    model_expert_1: str = "openai/gpt-5.2-chat"            # Этап 1
+    model_expert_1: str = "openai/gpt-5.2"                  # Этап 1
     model_expert_2: str = "google/gemini-3-pro-preview"    # Этап 1
     model_expert_3: str = "perplexity/sonar-pro-search"    # Этап 1
     model_reviewer: str = "anthropic/claude-sonnet-4.5"    # Этап 2 (Peer Review)
