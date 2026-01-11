@@ -24,6 +24,7 @@ export default function AdminPage() {
   const [newName, setNewName] = useState("");
   const [newUses, setNewUses] = useState(1);
   const [newCode, setNewCode] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [creating, setCreating] = useState(false);
 
   // Stats state
@@ -74,6 +75,17 @@ export default function AdminPage() {
       setStats(data);
     } catch (err) {
       console.error("Failed to load stats:", err);
+      setStats({
+        total_requests: 0,
+        successful_requests: 0,
+        failed_requests: 0,
+        by_model: {},
+        by_type: {},
+        by_user: {},
+        recent: [],
+        period_days: statsDays,
+        error: err instanceof Error ? err.message : "Ошибка загрузки"
+      });
     }
   };
 
@@ -114,11 +126,13 @@ export default function AdminPage() {
         token,
         newName.trim(),
         newUses,
-        newCode.trim() || undefined
+        newCode.trim() || undefined,
+        newDescription.trim() || undefined
       );
       setNewName("");
       setNewCode("");
       setNewUses(1);
+      setNewDescription("");
       await loadCodes();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка создания кода");
@@ -249,7 +263,7 @@ export default function AdminPage() {
               onClick={() => setError("")}
               className="float-right text-red-400 hover:text-red-300"
             >
-              ×
+              x
             </button>
           </div>
         )}
@@ -281,60 +295,73 @@ export default function AdminPage() {
         {/* Invite Codes Tab */}
         {activeTab === "codes" && (
           <>
-            {/* Create new code form */}
+            {/* Create new code form - all fields in rows */}
             <div className="bg-gray-800 rounded-lg p-6 mb-6">
               <h2 className="text-lg font-semibold mb-4">
                 Создать инвайт-код
               </h2>
-              <form
-                onSubmit={handleCreateCode}
-                className="flex gap-4 flex-wrap"
-              >
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-gray-400 text-xs mb-1">
-                    Имя пользователя
-                  </label>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
-                    placeholder="Иванов И.И."
-                    required
-                  />
+              <form onSubmit={handleCreateCode} className="space-y-4">
+                {/* Row 1: Name, Uses, Code, Button */}
+                <div className="grid grid-cols-12 gap-4 items-end">
+                  <div className="col-span-4">
+                    <label className="block text-gray-400 text-xs mb-1">
+                      Имя пользователя *
+                    </label>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
+                      placeholder="Иванов И.И."
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-gray-400 text-xs mb-1">
+                      Использований
+                    </label>
+                    <input
+                      type="number"
+                      value={newUses}
+                      onChange={(e) => setNewUses(parseInt(e.target.value) || 1)}
+                      min={1}
+                      className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-gray-400 text-xs mb-1">
+                      Код (авто)
+                    </label>
+                    <input
+                      type="text"
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+                      className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500 font-mono"
+                      placeholder="АВТО"
+                      maxLength={12}
+                    />
+                  </div>
+                  <div className="col-span-4">
+                    <label className="block text-gray-400 text-xs mb-1">
+                      Кто это / заметки
+                    </label>
+                    <input
+                      type="text"
+                      value={newDescription}
+                      onChange={(e) => setNewDescription(e.target.value)}
+                      className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
+                      placeholder="Тестировщик из компании X"
+                    />
+                  </div>
                 </div>
-                <div className="w-32">
-                  <label className="block text-gray-400 text-xs mb-1">
-                    Кол-во использований
-                  </label>
-                  <input
-                    type="number"
-                    value={newUses}
-                    onChange={(e) => setNewUses(parseInt(e.target.value) || 1)}
-                    min={1}
-                    className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
-                  />
-                </div>
-                <div className="w-40">
-                  <label className="block text-gray-400 text-xs mb-1">
-                    Код (авто)
-                  </label>
-                  <input
-                    type="text"
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-                    className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500 font-mono"
-                    placeholder="АВТО"
-                    maxLength={12}
-                  />
-                </div>
-                <div className="flex items-end">
+                {/* Button */}
+                <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={creating || !newName.trim()}
-                    className="bg-sgc-orange-500 hover:bg-sgc-orange-600 disabled:bg-gray-600 text-white font-semibold py-2 px-6 rounded transition-colors text-sm"
+                    className="bg-sgc-orange-500 hover:bg-sgc-orange-600 disabled:bg-gray-600 text-white font-semibold py-2 px-8 rounded transition-colors text-sm"
                   >
-                    {creating ? "..." : "Создать"}
+                    {creating ? "Создание..." : "Создать"}
                   </button>
                 </div>
               </form>
@@ -357,22 +384,25 @@ export default function AdminPage() {
                   <table className="w-full">
                     <thead className="bg-gray-700/50">
                       <tr>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Код
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Имя
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
+                          Описание
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Осталось
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Использован
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Создан
                         </th>
-                        <th className="px-6 py-3"></th>
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700">
@@ -385,7 +415,7 @@ export default function AdminPage() {
                               code.users.length > 0 && toggleRow(code.id)
                             }
                           >
-                            <td className="px-6 py-4 font-mono text-sgc-orange-400">
+                            <td className="px-4 py-3 font-mono text-sgc-orange-400 text-sm">
                               {code.code}
                               {code.users.length > 0 && (
                                 <span className="ml-2 text-xs text-gray-500">
@@ -393,8 +423,11 @@ export default function AdminPage() {
                                 </span>
                               )}
                             </td>
-                            <td className="px-6 py-4">{code.name}</td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-3 text-sm">{code.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-400 max-w-[200px] truncate">
+                              {code.description || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
                               <span
                                 className={
                                   code.uses_remaining > 0
@@ -405,7 +438,7 @@ export default function AdminPage() {
                                 {code.uses_remaining}
                               </span>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-3 text-sm">
                               {code.users.length > 0 ? (
                                 <span className="text-blue-400">
                                   {code.users.length} чел.
@@ -414,12 +447,12 @@ export default function AdminPage() {
                                 <span className="text-gray-500">—</span>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-gray-400 text-sm">
+                            <td className="px-4 py-3 text-gray-400 text-sm">
                               {new Date(code.created_at).toLocaleDateString(
                                 "ru-RU"
                               )}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-4 py-3 text-right">
                               <div className="flex gap-2 justify-end">
                                 {code.users.length > 0 && (
                                   <button
@@ -449,11 +482,11 @@ export default function AdminPage() {
                             code.users.length > 0 && (
                               <tr key={`${code.id}-users`}>
                                 <td
-                                  colSpan={6}
-                                  className="bg-gray-900/50 px-6 py-3"
+                                  colSpan={7}
+                                  className="bg-gray-900/50 px-4 py-3"
                                 >
                                   <div className="text-sm text-gray-400 mb-2">
-                                    Пользователи, использовавшие этот код:
+                                    Пользователи:
                                   </div>
                                   <div className="space-y-1">
                                     {code.users.map((user) => (
@@ -465,7 +498,6 @@ export default function AdminPage() {
                                           {user.name}
                                         </span>
                                         <span className="text-gray-500">
-                                          зарегистрирован{" "}
                                           {new Date(
                                             user.created_at
                                           ).toLocaleDateString("ru-RU", {
@@ -521,8 +553,9 @@ export default function AdminPage() {
                 Загрузка статистики...
               </div>
             ) : stats.error ? (
-              <div className="bg-red-900/50 text-red-300 rounded-lg p-4">
-                Ошибка загрузки: {stats.error}
+              <div className="bg-yellow-900/50 text-yellow-300 rounded-lg p-4 mb-6">
+                <p className="font-medium mb-2">Таблица usage_stats не найдена</p>
+                <p className="text-sm">Выполните SQL скрипт из файла SUPABASE_MIGRATION.sql в Supabase SQL Editor</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

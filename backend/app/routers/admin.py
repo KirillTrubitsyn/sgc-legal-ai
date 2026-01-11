@@ -39,6 +39,7 @@ class InviteCodeCreate(BaseModel):
     code: Optional[str] = None  # If not provided, will be auto-generated
     name: str
     uses: int = 1
+    description: Optional[str] = None  # Who is this person / notes
 
 
 class InviteCodeUpdate(BaseModel):
@@ -57,6 +58,7 @@ class InviteCodeResponse(BaseModel):
     name: str
     uses_remaining: int
     created_at: str
+    description: Optional[str] = None
 
 
 class InviteCodeWithUsersResponse(BaseModel):
@@ -65,6 +67,7 @@ class InviteCodeWithUsersResponse(BaseModel):
     name: str
     uses_remaining: int
     created_at: str
+    description: Optional[str] = None
     last_used_at: Optional[str] = None
     users: List[UserInfo] = []
 
@@ -141,7 +144,7 @@ async def create_new_invite_code(
     # Generate code if not provided
     code = request.code or secrets.token_urlsafe(8).upper()[:8]
 
-    result = create_invite_code(code, request.name, request.uses)
+    result = create_invite_code(code, request.name, request.uses, request.description)
 
     if not result:
         raise HTTPException(status_code=500, detail="Не удалось создать инвайт-код")
@@ -151,7 +154,8 @@ async def create_new_invite_code(
         code=result["code"],
         name=result["name"],
         uses_remaining=result["uses_remaining"],
-        created_at=result["created_at"]
+        created_at=result["created_at"],
+        description=result.get("description")
     )
 
 
@@ -195,6 +199,7 @@ async def list_invite_codes_with_users(token: str = Depends(verify_admin_token))
             name=c["name"],
             uses_remaining=c["uses_remaining"],
             created_at=c["created_at"],
+            description=c.get("description"),
             last_used_at=c.get("last_used_at"),
             users=[
                 UserInfo(
