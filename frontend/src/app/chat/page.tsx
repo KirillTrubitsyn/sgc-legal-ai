@@ -243,6 +243,10 @@ export default function ChatPage() {
               ]);
               return;
             }
+            // Skip heartbeat - don't update stage display
+            if (update.stage === "heartbeat") {
+              return;
+            }
             setConsiliumStage(update.stage);
             // Ensure message is always a string
             const stageMsg = typeof update.message === 'string'
