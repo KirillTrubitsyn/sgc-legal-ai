@@ -336,8 +336,11 @@ def delete_saved_response(response_id: str, user_id: str) -> bool:
 
 # Admin functions for invite codes with users
 
-def get_invite_codes_with_users() -> list:
-    """Get all invite codes with associated users"""
+def get_invite_codes_with_users() -> Dict[str, Any]:
+    """Get all invite codes with associated users
+
+    Returns dict with 'codes' list and optional 'error' string
+    """
     try:
         client = get_client()
         # Get invite codes
@@ -360,10 +363,11 @@ def get_invite_codes_with_users() -> list:
             users_response.raise_for_status()
             code["users"] = users_response.json()
 
-        return codes
+        return {"codes": codes, "error": None}
     except Exception as e:
-        print(f"get_invite_codes_with_users error: {e}")
-        return []
+        error_msg = str(e)
+        print(f"get_invite_codes_with_users error: {error_msg}")
+        return {"codes": [], "error": error_msg}
 
 
 def reset_invite_code(code_id: str, uses: int = 1) -> bool:

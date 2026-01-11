@@ -11,6 +11,7 @@ import {
   getUsageStats,
   InviteCodeWithUsers,
   UsageStats,
+  InviteCodesDetailedResponse,
 } from "@/lib/api";
 
 export default function AdminPage() {
@@ -21,6 +22,7 @@ export default function AdminPage() {
 
   // Invite codes state
   const [codes, setCodes] = useState<InviteCodeWithUsers[]>([]);
+  const [codesError, setCodesError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newUses, setNewUses] = useState(1);
   const [newCode, setNewCode] = useState("");
@@ -62,9 +64,11 @@ export default function AdminPage() {
     if (!token) return;
     try {
       const data = await getInviteCodesDetailed(token);
-      setCodes(data);
+      setCodes(data.codes);
+      setCodesError(data.error || null);
     } catch (err) {
       console.error("Failed to load codes:", err);
+      setCodesError(err instanceof Error ? err.message : "Ошибка загрузки");
     }
   };
 
@@ -113,6 +117,7 @@ export default function AdminPage() {
     setToken(null);
     localStorage.removeItem("admin_token");
     setCodes([]);
+    setCodesError(null);
     setStats(null);
   };
 
@@ -375,7 +380,15 @@ export default function AdminPage() {
                 </h2>
               </div>
 
-              {codes.length === 0 ? (
+              {codesError ? (
+                <div className="p-4 m-4 bg-red-900/50 text-red-300 rounded-lg">
+                  <p className="font-medium mb-2">Ошибка загрузки инвайт-кодов</p>
+                  <p className="text-sm">{codesError}</p>
+                  <p className="text-sm mt-2 text-gray-400">
+                    Проверьте подключение к базе данных Supabase и наличие таблицы invite_codes.
+                  </p>
+                </div>
+              ) : codes.length === 0 ? (
                 <div className="p-6 text-center text-gray-400">
                   Нет инвайт-кодов
                 </div>
