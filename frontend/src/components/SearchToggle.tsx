@@ -13,15 +13,15 @@ export default function SearchToggle({ enabled, onToggle, disabled }: Props) {
     <button
       onClick={() => onToggle(!enabled)}
       disabled={disabled}
-      className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors ${
+      className={`relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
         enabled
-          ? "bg-sgc-orange-500 text-white"
-          : "bg-gray-600 text-gray-300 hover:bg-gray-500"
+          ? "bg-sgc-orange-500 text-white shadow-lg shadow-sgc-orange-500/30"
+          : "bg-sgc-blue-700 text-gray-400 hover:text-gray-300"
       } ${disabled ? "opacity-50 pointer-events-none" : ""}`}
       title={enabled ? "Поиск включён" : "Поиск выключен"}
     >
       <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-      Поиск
+      <span className="hidden sm:inline">Поиск</span>
     </button>
   );
 }

@@ -7,23 +7,28 @@ interface Props {
 
 export default function ModeSelector({ mode, onModeChange }: Props) {
   return (
-    <div className="flex gap-1 sm:gap-2">
+    <div className="relative flex bg-sgc-blue-700 rounded-lg p-0.5 sm:p-1">
+      {/* Sliding indicator */}
+      <div
+        className={`absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 bg-sgc-orange-500 rounded-md transition-all duration-200 ease-out ${
+          mode === "single"
+            ? "left-0.5 sm:left-1 w-[calc(50%-2px)] sm:w-[calc(50%-4px)]"
+            : "left-[50%] w-[calc(50%-2px)] sm:w-[calc(50%-4px)]"
+        }`}
+      />
+
       <button
         onClick={() => onModeChange("single")}
-        className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-          mode === "single"
-            ? "bg-sgc-orange-500 text-white"
-            : "bg-sgc-blue-700 text-gray-300 hover:bg-sgc-blue-500"
+        className={`relative z-10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors duration-200 ${
+          mode === "single" ? "text-white" : "text-gray-400"
         }`}
       >
         Запрос
       </button>
       <button
         onClick={() => onModeChange("consilium")}
-        className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-          mode === "consilium"
-            ? "bg-sgc-orange-500 text-white"
-            : "bg-sgc-blue-700 text-gray-300 hover:bg-sgc-blue-500"
+        className={`relative z-10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors duration-200 ${
+          mode === "consilium" ? "text-white" : "text-gray-400"
         }`}
       >
         Консилиум
