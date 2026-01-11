@@ -1,6 +1,6 @@
 """
 DOCX generator service for exporting AI responses
-Стиль: Аналитическая справка (корпоративный юридический документ)
+Стиль: Правовое заключение (корпоративный юридический документ)
 """
 import io
 import re
@@ -45,9 +45,9 @@ def create_response_docx(
         run.add_picture(LOGO_PATH, width=Inches(0.6))
         header_para.paragraph_format.space_after = Pt(4)
 
-    # Main title - "АНАЛИТИЧЕСКАЯ СПРАВКА"
+    # Main title - "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ"
     title = doc.add_paragraph()
-    title_run = title.add_run("АНАЛИТИЧЕСКАЯ СПРАВКА")
+    title_run = title.add_run("ПРАВОВОЕ ЗАКЛЮЧЕНИЕ")
     title_run.bold = True
     title_run.font.size = Pt(14)
     title_run.font.name = 'Times New Roman'
@@ -127,7 +127,7 @@ def _add_sources_section(doc: Document, sources: List[str]):
 
 
 def _add_footer(doc: Document, model: Optional[str], created_at: Optional[datetime]):
-    """Add footer with date and disclaimer"""
+    """Add footer with date in document and disclaimer in page footer"""
     doc.add_paragraph()
 
     # Separator
@@ -151,18 +151,23 @@ def _add_footer(doc: Document, model: Optional[str], created_at: Optional[dateti
     meta_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     meta_para.paragraph_format.space_after = Pt(2)
 
-    # Disclaimer with model
-    disclaimer = doc.add_paragraph()
+    # Disclaimer in page footer (колонтитул)
     disclaimer_text = "Документ подготовлен SGC Legal AI"
     if model:
         disclaimer_text += f" | {_format_model_name(model)}"
     disclaimer_text += ". Носит информационно-справочный характер."
-    disclaimer_run = disclaimer.add_run(disclaimer_text)
-    disclaimer_run.font.size = Pt(8)
-    disclaimer_run.font.name = 'Times New Roman'
-    disclaimer_run.italic = True
-    disclaimer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    disclaimer.paragraph_format.space_before = Pt(0)
+
+    # Add to actual page footer
+    for section in doc.sections:
+        footer = section.footer
+        footer.is_linked_to_previous = False
+        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        footer_para.clear()
+        footer_run = footer_para.add_run(disclaimer_text)
+        footer_run.font.size = Pt(8)
+        footer_run.font.name = 'Times New Roman'
+        footer_run.italic = True
+        footer_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _format_model_name(model: str) -> str:
@@ -173,7 +178,8 @@ def _format_model_name(model: str) -> str:
         "openai/gpt-5.2": "GPT 5.2",
         "openai/gpt-4o": "GPT 4o",
         "google/gemini-3-pro-preview": "Gemini 3 Pro",
-        "perplexity/sonar-pro-search": "Perplexity Sonar"
+        "perplexity/sonar-pro-search": "Perplexity Sonar",
+        "consilium": "Консилиум"
     }
     return model_names.get(model, model.split("/")[-1])
 
