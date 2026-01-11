@@ -485,6 +485,7 @@ export interface InviteCode {
   name: string;
   uses_remaining: number;
   created_at: string;
+  description?: string;
 }
 
 export interface UserInfo {
@@ -555,7 +556,8 @@ export async function createInviteCode(
   token: string,
   name: string,
   uses: number,
-  code?: string
+  code?: string,
+  description?: string
 ): Promise<InviteCode> {
   const res = await fetch(`${API_URL}/api/admin/invite-codes`, {
     method: "POST",
@@ -563,7 +565,7 @@ export async function createInviteCode(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ name, uses, code }),
+    body: JSON.stringify({ name, uses, code, description }),
   });
 
   if (!res.ok) {

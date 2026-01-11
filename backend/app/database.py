@@ -162,17 +162,20 @@ def get_all_invite_codes() -> list:
         return []
 
 
-def create_invite_code(code: str, name: str, uses: int) -> Optional[Dict]:
-    """Create a new invite code"""
+def create_invite_code(code: str, name: str, uses: int, description: Optional[str] = None) -> Optional[Dict]:
+    """Create a new invite code with optional description"""
     try:
         client = get_client()
+        data = {
+            "code": code,
+            "name": name,
+            "uses_remaining": uses
+        }
+        if description:
+            data["description"] = description
         response = client.post(
             "/invite_codes",
-            json={
-                "code": code,
-                "name": name,
-                "uses_remaining": uses
-            }
+            json=data
         )
         response.raise_for_status()
         data = response.json()
