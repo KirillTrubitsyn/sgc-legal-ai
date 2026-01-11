@@ -155,7 +155,6 @@ def _add_footer(doc: Document, model: Optional[str], created_at: Optional[dateti
     disclaimer_text = "Документ подготовлен SGC Legal AI"
     if model:
         disclaimer_text += f" | {_format_model_name(model)}"
-    disclaimer_text += ". Носит информационно-справочный характер."
 
     # Add to actual page footer
     for section in doc.sections:
