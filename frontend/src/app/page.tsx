@@ -1,6 +1,33 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import InviteForm from "@/components/InviteForm";
 
 export default function Home() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const token = localStorage.getItem("sgc_token");
+    if (token) {
+      // Redirect to chat if token exists
+      router.push("/chat");
+    } else {
+      setChecking(false);
+    }
+  }, [router]);
+
+  // Show nothing while checking auth
+  if (checking) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">Загрузка...</div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8">
       {/* Logo */}
