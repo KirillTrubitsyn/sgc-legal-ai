@@ -100,7 +100,7 @@ export default function SavedPage() {
             <img
               src="/sgc-logo-horizontal.png"
               alt="SGC Legal AI"
-              className="h-16"
+              className="h-10"
             />
             <span className="text-gray-400">/ Сохранённые ответы</span>
           </div>
