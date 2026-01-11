@@ -487,6 +487,36 @@ export interface InviteCode {
   created_at: string;
 }
 
+export interface UserInfo {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface InviteCodeWithUsers extends InviteCode {
+  last_used_at?: string;
+  users: UserInfo[];
+}
+
+export interface UsageStats {
+  total_requests: number;
+  successful_requests: number;
+  failed_requests: number;
+  by_model: Record<string, { count: number; tokens: number }>;
+  by_type: Record<string, number>;
+  by_user: Record<string, number>;
+  recent: Array<{
+    id: string;
+    user_name: string;
+    model: string;
+    request_type: string;
+    success: boolean;
+    created_at: string;
+  }>;
+  period_days: number;
+  error?: string;
+}
+
 export async function adminLogin(password: string): Promise<{ token: string }> {
   const res = await fetch(`${API_URL}/api/admin/login`, {
     method: "POST",
@@ -575,6 +605,55 @@ export async function updateInviteCodeUses(
   if (!res.ok) {
     throw new Error("Не удалось обновить инвайт-код");
   }
+}
+
+export async function getInviteCodesDetailed(
+  token: string
+): Promise<InviteCodeWithUsers[]> {
+  const res = await fetch(`${API_URL}/api/admin/invite-codes-detailed`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось получить детальную информацию о кодах");
+  }
+
+  return res.json();
+}
+
+export async function resetInviteCode(
+  token: string,
+  codeId: string,
+  uses: number = 1
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/invite-codes/${codeId}/reset`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ uses }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Не удалось сбросить инвайт-код");
+  }
+}
+
+export async function getUsageStats(
+  token: string,
+  days: number = 30
+): Promise<UsageStats> {
+  const res = await fetch(`${API_URL}/api/admin/stats?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось получить статистику");
+  }
+
+  return res.json();
 }
 
 // Export functions
