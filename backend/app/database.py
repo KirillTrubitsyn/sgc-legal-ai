@@ -120,6 +120,57 @@ def create_session(invite_code_id: str, user_name: str) -> Optional[str]:
         return None
 
 
+def create_admin_session() -> Optional[str]:
+    """Create session for admin user (unlimited access, no invite code)"""
+    try:
+        client = get_client()
+
+        # Check if admin user already exists (by name 'Администратор' with no invite_code_id)
+        existing_admin_response = client.get(
+            "/users",
+            params={
+                "name": "eq.Администратор",
+                "invite_code_id": "is.null",
+                "select": "id,name"
+            }
+        )
+        existing_admin_response.raise_for_status()
+        existing_admins = existing_admin_response.json()
+
+        if existing_admins:
+            # Reuse existing admin user
+            user_id = existing_admins[0]["id"]
+        else:
+            # Create admin user (no invite code association)
+            user_response = client.post(
+                "/users",
+                json={
+                    "name": "Администратор"
+                }
+            )
+            user_response.raise_for_status()
+            user_data = user_response.json()
+            user_id = user_data[0]["id"]
+
+        # Generate token
+        token = secrets.token_urlsafe(32)
+
+        # Create session
+        session_response = client.post(
+            "/sessions",
+            json={
+                "user_id": user_id,
+                "token": token
+            }
+        )
+        session_response.raise_for_status()
+
+        return token
+    except Exception as e:
+        print(f"create_admin_session error: {e}")
+        return None
+
+
 def validate_session(token: str) -> Optional[Dict]:
     """Validate session token"""
     try:
