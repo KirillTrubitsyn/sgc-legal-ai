@@ -72,6 +72,11 @@ class InviteCodeWithUsersResponse(BaseModel):
     users: List[UserInfo] = []
 
 
+class InviteCodesDetailedResponse(BaseModel):
+    codes: List[InviteCodeWithUsersResponse]
+    error: Optional[str] = None
+
+
 class ResetCodeRequest(BaseModel):
     uses: int = 1
 
@@ -188,30 +193,36 @@ async def update_invite_code(
     return {"success": True}
 
 
-@router.get("/invite-codes-detailed", response_model=List[InviteCodeWithUsersResponse])
+@router.get("/invite-codes-detailed", response_model=InviteCodesDetailedResponse)
 async def list_invite_codes_with_users(token: str = Depends(verify_admin_token)):
     """Get all invite codes with user information"""
-    codes = get_invite_codes_with_users()
-    return [
-        InviteCodeWithUsersResponse(
-            id=c["id"],
-            code=c["code"],
-            name=c["name"],
-            uses_remaining=c["uses_remaining"],
-            created_at=c["created_at"],
-            description=c.get("description"),
-            last_used_at=c.get("last_used_at"),
-            users=[
-                UserInfo(
-                    id=u["id"],
-                    name=u["name"],
-                    created_at=u["created_at"]
-                )
-                for u in c.get("users", [])
-            ]
-        )
-        for c in codes
-    ]
+    result = get_invite_codes_with_users()
+    codes = result.get("codes", [])
+    error = result.get("error")
+
+    return InviteCodesDetailedResponse(
+        codes=[
+            InviteCodeWithUsersResponse(
+                id=c["id"],
+                code=c["code"],
+                name=c["name"],
+                uses_remaining=c["uses_remaining"],
+                created_at=c["created_at"],
+                description=c.get("description"),
+                last_used_at=c.get("last_used_at"),
+                users=[
+                    UserInfo(
+                        id=u["id"],
+                        name=u["name"],
+                        created_at=u["created_at"]
+                    )
+                    for u in c.get("users", [])
+                ]
+            )
+            for c in codes
+        ],
+        error=error
+    )
 
 
 @router.post("/invite-codes/{code_id}/reset")

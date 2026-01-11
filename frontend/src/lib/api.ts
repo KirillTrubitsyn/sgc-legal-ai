@@ -499,6 +499,11 @@ export interface InviteCodeWithUsers extends InviteCode {
   users: UserInfo[];
 }
 
+export interface InviteCodesDetailedResponse {
+  codes: InviteCodeWithUsers[];
+  error?: string;
+}
+
 export interface UsageStats {
   total_requests: number;
   successful_requests: number;
@@ -611,7 +616,7 @@ export async function updateInviteCodeUses(
 
 export async function getInviteCodesDetailed(
   token: string
-): Promise<InviteCodeWithUsers[]> {
+): Promise<InviteCodesDetailedResponse> {
   const res = await fetch(`${API_URL}/api/admin/invite-codes-detailed`, {
     headers: { Authorization: `Bearer ${token}` },
   });
