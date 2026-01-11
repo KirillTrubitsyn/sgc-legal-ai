@@ -18,8 +18,10 @@ from app.database import (
     clear_chat_history,
     save_response,
     get_saved_responses,
-    delete_saved_response
+    delete_saved_response,
+    save_usage_stat
 )
+import time
 from app.services.openrouter import chat_completion_stream
 from app.services.docx_generator import create_response_docx
 from app.services import perplexity
@@ -206,6 +208,7 @@ async def single_query(
     """
     session = get_session_from_token(authorization)
     user_id = session["user_id"]
+    user_name = session.get("users", {}).get("name", "Аноним") if isinstance(session.get("users"), dict) else "Аноним"
 
     # Get user's question
     user_messages = [m for m in request.messages if m.role == "user"]
@@ -223,6 +226,9 @@ async def single_query(
     async def generate():
         full_response = ""
         search_results = ""
+        start_time = time.time()
+        success = True
+        error_msg = None
 
         try:
             # Stage 1: Search (if enabled)
@@ -266,7 +272,24 @@ async def single_query(
                 save_chat_message(user_id, "assistant", full_response, model)
 
         except Exception as e:
+            success = False
+            error_msg = str(e)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        finally:
+            # Save usage statistics
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            save_usage_stat(
+                user_id=user_id,
+                user_name=user_name,
+                invite_code=None,
+                model=model,
+                request_type=f"single_query_{request.mode.value}",
+                response_time_ms=elapsed_ms,
+                tokens_used=len(full_response.split()) if full_response else 0,
+                success=success,
+                error_message=error_msg
+            )
 
     return StreamingResponse(
         generate(),

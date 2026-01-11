@@ -1,18 +1,21 @@
 """
-Admin router for managing invite codes
+Admin router for managing invite codes and usage statistics
 """
 import secrets
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from app.config import settings
 from app.database import (
     get_all_invite_codes,
     create_invite_code,
     delete_invite_code,
-    update_invite_code_uses
+    update_invite_code_uses,
+    get_invite_codes_with_users,
+    reset_invite_code,
+    get_usage_stats
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -42,12 +45,44 @@ class InviteCodeUpdate(BaseModel):
     uses: int
 
 
+class UserInfo(BaseModel):
+    id: str
+    name: str
+    created_at: str
+
+
 class InviteCodeResponse(BaseModel):
     id: str
     code: str
     name: str
     uses_remaining: int
     created_at: str
+
+
+class InviteCodeWithUsersResponse(BaseModel):
+    id: str
+    code: str
+    name: str
+    uses_remaining: int
+    created_at: str
+    last_used_at: Optional[str] = None
+    users: List[UserInfo] = []
+
+
+class ResetCodeRequest(BaseModel):
+    uses: int = 1
+
+
+class UsageStatsResponse(BaseModel):
+    total_requests: int
+    successful_requests: int
+    failed_requests: int
+    by_model: Dict[str, Any]
+    by_type: Dict[str, int]
+    by_user: Dict[str, int]
+    recent: List[Dict[str, Any]]
+    period_days: int
+    error: Optional[str] = None
 
 
 def verify_admin_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -147,3 +182,53 @@ async def update_invite_code(
         raise HTTPException(status_code=500, detail="Не удалось обновить инвайт-код")
 
     return {"success": True}
+
+
+@router.get("/invite-codes-detailed", response_model=List[InviteCodeWithUsersResponse])
+async def list_invite_codes_with_users(token: str = Depends(verify_admin_token)):
+    """Get all invite codes with user information"""
+    codes = get_invite_codes_with_users()
+    return [
+        InviteCodeWithUsersResponse(
+            id=c["id"],
+            code=c["code"],
+            name=c["name"],
+            uses_remaining=c["uses_remaining"],
+            created_at=c["created_at"],
+            last_used_at=c.get("last_used_at"),
+            users=[
+                UserInfo(
+                    id=u["id"],
+                    name=u["name"],
+                    created_at=u["created_at"]
+                )
+                for u in c.get("users", [])
+            ]
+        )
+        for c in codes
+    ]
+
+
+@router.post("/invite-codes/{code_id}/reset")
+async def reset_code(
+    code_id: str,
+    request: ResetCodeRequest,
+    token: str = Depends(verify_admin_token)
+):
+    """Reset an invite code - restore uses and clear associated users"""
+    success = reset_invite_code(code_id, request.uses)
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Не удалось сбросить инвайт-код")
+
+    return {"success": True, "message": "Код сброшен, пользователи удалены"}
+
+
+@router.get("/stats", response_model=UsageStatsResponse)
+async def get_stats(
+    days: int = Query(default=30, ge=1, le=365),
+    token: str = Depends(verify_admin_token)
+):
+    """Get usage statistics for the admin panel"""
+    stats = get_usage_stats(days=days)
+    return UsageStatsResponse(**stats)
