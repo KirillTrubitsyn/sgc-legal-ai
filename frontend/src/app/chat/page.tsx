@@ -294,21 +294,21 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       {/* Header */}
-      <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-6 py-4">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center gap-4">
+      <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center justify-between max-w-6xl mx-auto gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <img
               src="/sgc-logo-horizontal.png"
               alt="SGC Legal AI"
-              className="h-[74px]"
+              className="h-10 sm:h-[74px] shrink-0"
             />
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <a
               href="/saved"
-              className="text-gray-400 hover:text-white text-sm"
+              className="text-gray-400 hover:text-white text-xs sm:text-sm"
             >
               Сохранённые
             </a>
@@ -317,7 +317,7 @@ export default function ChatPage() {
             </span>
             <button
               onClick={handleLogout}
-              className="text-gray-400 hover:text-white text-sm"
+              className="text-gray-400 hover:text-white text-xs sm:text-sm"
             >
               Выйти
             </button>
@@ -326,9 +326,9 @@ export default function ChatPage() {
       </header>
 
       {/* Mode & Query Mode Selector */}
-      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-6 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
+      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-3 sm:px-6 py-2 sm:py-3">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
             <ModeSelector mode={mode} onModeChange={setMode} />
             {mode === "single" && (
               <>
@@ -348,7 +348,7 @@ export default function ChatPage() {
           {messages.length > 0 && (
             <button
               onClick={handleNewChat}
-              className="text-gray-400 hover:text-white text-sm whitespace-nowrap"
+              className="text-gray-400 hover:text-white text-sm whitespace-nowrap self-end sm:self-auto"
             >
               + Новый чат
             </button>
@@ -357,7 +357,7 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto px-6 py-6">
+      <main className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
           {messages.length === 0 && !streamingContent && !consiliumStage && !singleQueryStage && !uploadedFile ? (
             <div className="text-center text-gray-500 mt-20">
@@ -496,7 +496,7 @@ export default function ChatPage() {
       </main>
 
       {/* Input Area */}
-      <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-6 py-4">
+      <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex gap-3 items-end">
             <FileUpload

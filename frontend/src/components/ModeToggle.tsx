@@ -17,7 +17,7 @@ export default function ModeToggle({ mode, onModeChange, disabled }: Props) {
   ];
 
   return (
-    <div className={`flex gap-2 ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
+    <div className={`flex gap-1 sm:gap-2 ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
       {modes.map((m) => {
         const Icon = m.icon;
         return (
@@ -25,13 +25,13 @@ export default function ModeToggle({ mode, onModeChange, disabled }: Props) {
             key={m.id}
             onClick={() => onModeChange(m.id)}
             disabled={disabled}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors ${
               mode === m.id
                 ? "bg-sgc-orange-500 text-white"
                 : "bg-sgc-blue-700 text-gray-300 hover:bg-sgc-blue-500"
             }`}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {m.name}
           </button>
         );
