@@ -198,11 +198,11 @@ def _setup_styles(doc: Document):
 
 def _clean_text_for_docx(text: str) -> str:
     """Remove duplicate headers and clean up text before parsing"""
-    # Remove duplicate "АНАЛИТИЧЕСКАЯ СПРАВКА" at the beginning
-    text = re.sub(r'^[\s\n]*АНАЛИТИЧЕСКАЯ СПРАВКА[\s\n]*', '', text, flags=re.IGNORECASE)
+    # Remove "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ" header (with optional continuation on same/next lines)
+    text = re.sub(r'^[\s\n]*ПРАВОВОЕ ЗАКЛЮЧЕНИЕ[^\n]*\n?', '', text, flags=re.IGNORECASE)
 
-    # Remove "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ" header
-    text = re.sub(r'^[\s\n]*ПРАВОВОЕ ЗАКЛЮЧЕНИЕ[\s\n]*', '', text, flags=re.IGNORECASE)
+    # Remove "АНАЛИТИЧЕСКАЯ СПРАВКА" header (with optional continuation like "ПО ПОСТАНОВЛЕНИЮ...")
+    text = re.sub(r'^[\s\n]*АНАЛИТИЧЕСКАЯ СПРАВКА[^\n]*\n?', '', text, flags=re.IGNORECASE)
 
     # Remove "Председатель юридического консилиума" and similar signatures
     text = re.sub(r'^Председатель\s+(юридического\s+)?консилиума.*$', '', text, flags=re.MULTILINE | re.IGNORECASE)
