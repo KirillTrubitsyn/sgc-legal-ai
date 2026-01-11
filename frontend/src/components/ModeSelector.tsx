@@ -16,7 +16,7 @@ export default function ModeSelector({ mode, onModeChange }: Props) {
             : "bg-sgc-blue-700 text-gray-300 hover:bg-sgc-blue-500"
         }`}
       >
-        Single Query
+        Запрос
       </button>
       <button
         onClick={() => onModeChange("consilium")}
@@ -26,7 +26,7 @@ export default function ModeSelector({ mode, onModeChange }: Props) {
             : "bg-sgc-blue-700 text-gray-300 hover:bg-sgc-blue-500"
         }`}
       >
-        Consilium
+        Консилиум
       </button>
     </div>
   );
