@@ -172,13 +172,17 @@ def _add_footer(doc: Document, model: Optional[str], created_at: Optional[dateti
 def _format_model_name(model: str) -> str:
     """Format model ID to readable name"""
     model_names = {
+        # Single mode - показываем режим вместо модели
+        "google/gemini-3-flash-preview": "Быстрый",
+        "google/gemini-3-pro-preview": "Думающий",
+        # Consilium
+        "consilium": "Консилиум",
+        # Fallback для других моделей
         "anthropic/claude-opus-4.5": "Claude Opus 4.5",
         "anthropic/claude-sonnet-4": "Claude Sonnet 4",
         "openai/gpt-5.2": "GPT 5.2",
         "openai/gpt-4o": "GPT 4o",
-        "google/gemini-3-pro-preview": "Gemini 3 Pro",
         "perplexity/sonar-pro-search": "Perplexity Sonar",
-        "consilium": "Консилиум"
     }
     return model_names.get(model, model.split("/")[-1])
 
