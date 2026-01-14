@@ -324,7 +324,7 @@ export default function AdminPage() {
                   </div>
                   <div className="col-span-2">
                     <label className="block text-gray-400 text-xs mb-1">
-                      Использований
+                      Макс. польз.
                     </label>
                     <input
                       type="number"
@@ -332,6 +332,7 @@ export default function AdminPage() {
                       onChange={(e) => setNewUses(parseInt(e.target.value) || 1)}
                       min={1}
                       className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
+                      title="Максимальное количество разных пользователей, которые могут войти с этим кодом"
                     />
                   </div>
                   <div className="col-span-2">
@@ -407,8 +408,8 @@ export default function AdminPage() {
                         <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Описание
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
-                          Осталось
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase" title="Сколько ещё новых пользователей могут войти с этим кодом">
+                          Свободно
                         </th>
                         <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Использован
