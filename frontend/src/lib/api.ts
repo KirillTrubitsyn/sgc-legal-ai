@@ -650,9 +650,10 @@ export async function resetInviteCode(
 
 export async function getUsageStats(
   token: string,
-  days: number = 30
+  days: number = 30,
+  recentLimit: number = 10
 ): Promise<UsageStats> {
-  const res = await fetch(`${API_URL}/api/admin/stats?days=${days}`, {
+  const res = await fetch(`${API_URL}/api/admin/stats?days=${days}&recent_limit=${recentLimit}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
