@@ -243,8 +243,9 @@ async def reset_code(
 @router.get("/stats", response_model=UsageStatsResponse)
 async def get_stats(
     days: int = Query(default=30, ge=1, le=365),
+    recent_limit: int = Query(default=10, ge=1, le=100),
     token: str = Depends(verify_admin_token)
 ):
     """Get usage statistics for the admin panel"""
-    stats = get_usage_stats(days=days)
+    stats = get_usage_stats(days=days, recent_limit=recent_limit)
     return UsageStatsResponse(**stats)
