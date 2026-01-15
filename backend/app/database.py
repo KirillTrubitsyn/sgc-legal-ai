@@ -237,49 +237,9 @@ def create_invite_code(code: str, name: str, uses: int, description: Optional[st
 
 
 def delete_invite_code(code_id: str) -> bool:
-    """Delete an invite code and all associated data"""
+    """Delete an invite code"""
     try:
         client = get_client()
-
-        # First, get all users associated with this invite code
-        users_response = client.get(
-            "/users",
-            params={"invite_code_id": f"eq.{code_id}", "select": "id"}
-        )
-        users_response.raise_for_status()
-        users = users_response.json()
-
-        # Delete all related data for each user
-        for user in users:
-            user_id = user["id"]
-            # Delete sessions
-            client.delete(
-                "/sessions",
-                params={"user_id": f"eq.{user_id}"}
-            )
-            # Delete chat messages
-            client.delete(
-                "/chat_messages",
-                params={"user_id": f"eq.{user_id}"}
-            )
-            # Delete saved responses
-            client.delete(
-                "/saved_responses",
-                params={"user_id": f"eq.{user_id}"}
-            )
-            # Delete usage stats for this user
-            client.delete(
-                "/usage_stats",
-                params={"user_id": f"eq.{user_id}"}
-            )
-
-        # Delete all users associated with this invite code
-        client.delete(
-            "/users",
-            params={"invite_code_id": f"eq.{code_id}"}
-        )
-
-        # Finally, delete the invite code itself
         response = client.delete(
             "/invite_codes",
             params={"id": f"eq.{code_id}"}
@@ -551,14 +511,8 @@ def save_usage_stat(
         return None
 
 
-def get_usage_stats(days: int = 30, limit: int = 1000, recent_limit: int = 10) -> Dict[str, Any]:
-    """Get usage statistics summary
-
-    Args:
-        days: Number of days to look back
-        limit: Maximum number of records to fetch for aggregation
-        recent_limit: Number of recent activity records to return (1-100)
-    """
+def get_usage_stats(days: int = 30, limit: int = 1000) -> Dict[str, Any]:
+    """Get usage statistics summary"""
     try:
         client = get_client()
 
@@ -608,8 +562,8 @@ def get_usage_stats(days: int = 30, limit: int = 1000, recent_limit: int = 10) -
                 by_user[user_name] = 0
             by_user[user_name] += 1
 
-        # Recent activity (configurable limit)
-        recent = stats[:recent_limit]
+        # Recent activity (last 10)
+        recent = stats[:10]
 
         return {
             "total_requests": total_requests,
