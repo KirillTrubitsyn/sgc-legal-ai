@@ -237,9 +237,41 @@ def create_invite_code(code: str, name: str, uses: int, description: Optional[st
 
 
 def delete_invite_code(code_id: str) -> bool:
-    """Delete an invite code"""
+    """Delete an invite code and all associated users"""
     try:
         client = get_client()
+
+        # Get users associated with this invite code
+        users_response = client.get(
+            "/users",
+            params={"invite_code_id": f"eq.{code_id}", "select": "id"}
+        )
+        users_response.raise_for_status()
+        users = users_response.json()
+
+        # Delete related data for each user
+        for user in users:
+            user_id = user["id"]
+            # Delete sessions (ignore errors)
+            try:
+                client.delete("/sessions", params={"user_id": f"eq.{user_id}"})
+            except Exception:
+                pass
+            # Delete chat messages (ignore errors)
+            try:
+                client.delete("/chat_messages", params={"user_id": f"eq.{user_id}"})
+            except Exception:
+                pass
+            # Delete saved responses (ignore errors)
+            try:
+                client.delete("/saved_responses", params={"user_id": f"eq.{user_id}"})
+            except Exception:
+                pass
+
+        # Delete users associated with this invite code
+        client.delete("/users", params={"invite_code_id": f"eq.{code_id}"})
+
+        # Delete the invite code itself
         response = client.delete(
             "/invite_codes",
             params={"id": f"eq.{code_id}"}
