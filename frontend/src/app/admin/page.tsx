@@ -32,7 +32,6 @@ export default function AdminPage() {
   // Stats state
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [statsDays, setStatsDays] = useState(30);
-  const [recentLimit, setRecentLimit] = useState(10);
   const [activeTab, setActiveTab] = useState<"codes" | "stats">("codes");
 
   // Expanded rows for showing users
@@ -54,12 +53,12 @@ export default function AdminPage() {
     }
   }, [token]);
 
-  // Reload stats when days or recentLimit change
+  // Reload stats when days change
   useEffect(() => {
     if (token && activeTab === "stats") {
       loadStats();
     }
-  }, [statsDays, recentLimit]);
+  }, [statsDays]);
 
   const loadCodes = async () => {
     if (!token) return;
@@ -76,7 +75,7 @@ export default function AdminPage() {
   const loadStats = async () => {
     if (!token) return;
     try {
-      const data = await getUsageStats(token, statsDays, recentLimit);
+      const data = await getUsageStats(token, statsDays);
       setStats(data);
     } catch (err) {
       console.error("Failed to load stats:", err);
@@ -324,7 +323,7 @@ export default function AdminPage() {
                   </div>
                   <div className="col-span-2">
                     <label className="block text-gray-400 text-xs mb-1">
-                      Макс. польз.
+                      Использований
                     </label>
                     <input
                       type="number"
@@ -332,7 +331,6 @@ export default function AdminPage() {
                       onChange={(e) => setNewUses(parseInt(e.target.value) || 1)}
                       min={1}
                       className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
-                      title="Максимальное количество разных пользователей, которые могут войти с этим кодом"
                     />
                   </div>
                   <div className="col-span-2">
@@ -408,8 +406,8 @@ export default function AdminPage() {
                         <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Описание
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase" title="Сколько ещё новых пользователей могут войти с этим кодом">
-                          Свободно
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
+                          Осталось
                         </th>
                         <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">
                           Использован
@@ -689,26 +687,14 @@ export default function AdminPage() {
 
                 {/* Recent Activity */}
                 <div className="bg-gray-800 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">
-                      Последняя активность
-                    </h3>
-                    <select
-                      value={recentLimit}
-                      onChange={(e) => setRecentLimit(parseInt(e.target.value))}
-                      className="bg-gray-700 text-white rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
-                    >
-                      <option value={10}>10 записей</option>
-                      <option value={25}>25 записей</option>
-                      <option value={50}>50 записей</option>
-                      <option value={100}>100 записей</option>
-                    </select>
-                  </div>
+                  <h3 className="text-lg font-semibold mb-4">
+                    Последняя активность
+                  </h3>
                   {stats.recent.length === 0 ? (
                     <div className="text-gray-500 text-sm">Нет данных</div>
                   ) : (
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                      {stats.recent.map((item, idx) => (
+                    <div className="space-y-2">
+                      {stats.recent.slice(0, 10).map((item, idx) => (
                         <div
                           key={idx}
                           className="flex items-center gap-2 text-sm"
