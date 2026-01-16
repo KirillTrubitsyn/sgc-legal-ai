@@ -46,7 +46,7 @@ export default function ChatInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
-        rows={Math.min(5, Math.max(1, input.split('\n').length))}
+        rows={5}
         className="flex-1 px-4 py-3 bg-sgc-blue-700 border border-sgc-blue-500 rounded-xl
                    text-white placeholder-gray-400 focus:outline-none focus:border-sgc-orange-500
                    resize-none disabled:opacity-50"
