@@ -7,6 +7,7 @@ import base64
 from typing import Tuple
 import docx
 import pdfplumber
+import fitz  # PyMuPDF
 import requests
 from app.config import settings
 
@@ -67,7 +68,7 @@ async def process_file(file_content: bytes, filename: str) -> Tuple[str, str]:
     if file_type == 'document':
         text = extract_docx(file_content)
     elif file_type == 'pdf':
-        text = extract_pdf(file_content)
+        text = await extract_pdf(file_content)
     elif file_type == 'text':
         text = file_content.decode('utf-8', errors='ignore')
     elif file_type == 'image':
@@ -102,13 +103,17 @@ def extract_docx(content: bytes) -> str:
         os.unlink(tmp_path)
 
 
-def extract_pdf(content: bytes) -> str:
-    """Извлечь текст из PDF"""
+async def extract_pdf(content: bytes) -> str:
+    """
+    Извлечь текст из PDF
+    Сначала пробует pdfplumber, если текст не извлёкся - использует OCR через Gemini
+    """
     with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
 
     try:
+        # Попробовать извлечь текст напрямую
         text_parts = []
         with pdfplumber.open(tmp_path) as pdf:
             for page in pdf.pages:
@@ -124,9 +129,89 @@ def extract_pdf(content: bytes) -> str:
                         if row_text.strip():
                             text_parts.append(row_text)
 
-        return '\n\n'.join(text_parts)
+        extracted_text = '\n\n'.join(text_parts)
+
+        # Если текст извлёкся - возвращаем его
+        if extracted_text and len(extracted_text.strip()) > 50:
+            return extracted_text
+
+        # Если текст не извлёкся - это сканированный PDF, используем OCR
+        return await extract_pdf_ocr(tmp_path)
+
     finally:
         os.unlink(tmp_path)
+
+
+async def extract_pdf_ocr(pdf_path: str) -> str:
+    """
+    OCR для сканированного PDF через Gemini
+    Конвертирует страницы в изображения и отправляет на распознавание
+    """
+    text_parts = []
+
+    # Открываем PDF с помощью PyMuPDF
+    doc = fitz.open(pdf_path)
+
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+
+        # Рендерим страницу в изображение (300 DPI для хорошего качества OCR)
+        mat = fitz.Matrix(2.0, 2.0)  # 2x zoom ≈ 144 DPI (достаточно для OCR)
+        pix = page.get_pixmap(matrix=mat)
+        img_bytes = pix.tobytes("png")
+
+        # Отправляем на OCR
+        page_text = await ocr_image_gemini(img_bytes)
+        if page_text and page_text.strip() and page_text != "Текст не обнаружен":
+            text_parts.append(f"--- Страница {page_num + 1} ---\n{page_text}")
+
+    doc.close()
+
+    if not text_parts:
+        raise ValueError("Не удалось извлечь текст из PDF (OCR не обнаружил текст)")
+
+    return '\n\n'.join(text_parts)
+
+
+async def ocr_image_gemini(image_bytes: bytes) -> str:
+    """OCR для одного изображения через Gemini"""
+    image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {settings.openrouter_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
+            "X-Title": "SGC Legal AI"
+        },
+        json={
+            "model": settings.model_file_processor,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Распознай и извлеки весь текст с этого изображения. Выведи только распознанный текст, сохраняя структуру и форматирование. Если текста нет, напиши 'Текст не обнаружен'."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 4096
+        },
+        timeout=120
+    )
+
+    response.raise_for_status()
+    result = response.json()
+    return result["choices"][0]["message"]["content"]
 
 
 async def extract_image_gemini(content: bytes, filename: str) -> str:
