@@ -144,14 +144,16 @@ export default function ChatPage() {
   const handleSend = async (content: string) => {
     if (isLoading) return;
 
-    // Если есть загруженный файл, добавляем текст к сообщению
-    let fullContent = content;
+    // Сохраняем контекст файла отдельно (не показывается в UI, только для LLM)
+    let fileContext: string | undefined;
+    let displayContent = content;
     if (uploadedFile) {
-      fullContent = `[Загружен файл: ${uploadedFile.summary}]\n\nСодержимое файла:\n${uploadedFile.extracted_text}\n\nВопрос пользователя:\n${content}`;
+      fileContext = `${uploadedFile.summary}\n\n${uploadedFile.extracted_text}`;
+      displayContent = `📎 ${uploadedFile.summary.split("|")[0].trim()}\n\n${content}`;
       setUploadedFile(null);
     }
 
-    const userMessage: Message = { role: "user", content };
+    const userMessage: Message = { role: "user", content: displayContent };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
     setPendingText("");
@@ -165,7 +167,7 @@ export default function ChatPage() {
       try {
         const allMessages = [
           ...messages.filter((m): m is Message => "role" in m && !("type" in m)),
-          { role: "user" as const, content: fullContent },
+          { role: "user" as const, content },
         ];
 
         const result = await sendQuery(
@@ -179,7 +181,8 @@ export default function ChatPage() {
           (update: SingleQueryStageUpdate) => {
             setSingleQueryStage(update.stage);
             setSingleQueryMessage(update.message || "");
-          }
+          },
+          fileContext
         );
 
         setSingleQueryStage("");
@@ -218,10 +221,15 @@ export default function ChatPage() {
       setConsiliumStage("starting");
       setConsiliumMessage("Запуск консилиума...");
 
+      // Для Consilium передаём контекст файла вместе с вопросом
+      const consiliumQuery = fileContext
+        ? `[Контекст загруженного файла]\n${fileContext}\n\n[Вопрос пользователя]\n${content}`
+        : content;
+
       try {
         const result = await runConsilium(
           token,
-          fullContent,
+          consiliumQuery,
           (update: StageUpdate) => {
             // Handle error/timeout stages
             if (update.stage === "error" || update.stage === "timeout") {
