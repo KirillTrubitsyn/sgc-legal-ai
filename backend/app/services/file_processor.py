@@ -148,7 +148,7 @@ async def extract_image_gemini(content: bytes, filename: str) -> str:
             "X-Title": "SGC Legal AI"
         },
         json={
-            "model": settings.llm_file_processor,
+            "model": settings.model_file_processor,
             "messages": [
                 {
                     "role": "user",
@@ -196,7 +196,7 @@ async def transcribe_audio_gemini(content: bytes, filename: str) -> str:
             "X-Title": "SGC Legal AI"
         },
         json={
-            "model": settings.llm_file_processor,
+            "model": settings.model_file_processor,
             "messages": [
                 {
                     "role": "user",
