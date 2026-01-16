@@ -11,6 +11,7 @@ interface Props {
 
 const ACCEPTED_TYPES = [
   ".docx", ".doc", ".pdf", ".txt", ".md",
+  ".xlsx", ".xls", ".xlsm",
   ".jpg", ".jpeg", ".png", ".gif", ".bmp",
   ".mp3", ".wav", ".ogg", ".m4a", ".webm"
 ].join(",");
@@ -112,7 +113,7 @@ export default function FileUpload({ token, onFileProcessed, disabled }: Props) 
             Загрузить файл
           </button>
           <div className="px-4 py-2 text-xs text-gray-500 border-t border-sgc-blue-500">
-            DOCX, PDF, TXT, изображения, аудио
+            DOCX, PDF, Excel, TXT, изображения, аудио
           </div>
         </div>
       )}

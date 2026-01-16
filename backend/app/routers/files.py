@@ -95,6 +95,10 @@ async def get_supported_formats():
                 "extensions": [".docx", ".doc", ".pdf", ".txt", ".md"],
                 "description": "Документы — извлечение текста"
             },
+            "spreadsheets": {
+                "extensions": [".xlsx", ".xls", ".xlsm"],
+                "description": "Таблицы Excel — извлечение данных в markdown"
+            },
             "images": {
                 "extensions": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"],
                 "description": "Изображения — распознавание текста (OCR)"
