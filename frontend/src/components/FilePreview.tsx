@@ -10,6 +10,7 @@ interface Props {
 const TYPE_ICONS: Record<string, string> = {
   document: "📄",
   pdf: "📕",
+  spreadsheet: "📊",
   text: "📝",
   image: "🖼️",
   audio: "🎵",

@@ -8,6 +8,8 @@ from typing import Tuple
 import docx
 import pdfplumber
 import fitz  # PyMuPDF
+from openpyxl import load_workbook
+from io import BytesIO
 import requests
 from app.config import settings
 
@@ -20,6 +22,8 @@ def detect_file_type(filename: str) -> str:
         return 'document'
     elif ext == 'pdf':
         return 'pdf'
+    elif ext in ['xlsx', 'xls', 'xlsm']:
+        return 'spreadsheet'
     elif ext in ['txt', 'md', 'markdown']:
         return 'text'
     elif ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff']:
@@ -69,6 +73,8 @@ async def process_file(file_content: bytes, filename: str) -> Tuple[str, str]:
         text = extract_docx(file_content)
     elif file_type == 'pdf':
         text = await extract_pdf(file_content)
+    elif file_type == 'spreadsheet':
+        text = extract_excel(file_content)
     elif file_type == 'text':
         text = file_content.decode('utf-8', errors='ignore')
     elif file_type == 'image':
@@ -101,6 +107,63 @@ def extract_docx(content: bytes) -> str:
         return '\n\n'.join(paragraphs)
     finally:
         os.unlink(tmp_path)
+
+
+def extract_excel(content: bytes) -> str:
+    """
+    Извлечь данные из Excel файла (xlsx, xls, xlsm)
+    Конвертирует каждый лист в markdown таблицу
+    """
+    wb = load_workbook(filename=BytesIO(content), read_only=True, data_only=True)
+    result_parts = []
+
+    for sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+        rows = list(sheet.iter_rows(values_only=True))
+
+        if not rows:
+            continue
+
+        # Фильтруем полностью пустые строки
+        rows = [row for row in rows if any(cell is not None for cell in row)]
+
+        if not rows:
+            continue
+
+        # Определяем максимальное количество колонок
+        max_cols = max(len(row) for row in rows)
+
+        # Нормализуем строки до одинаковой длины
+        normalized_rows = []
+        for row in rows:
+            normalized_row = list(row) + [None] * (max_cols - len(row))
+            normalized_rows.append(normalized_row)
+
+        # Формируем markdown таблицу
+        md_lines = []
+        md_lines.append(f"## Лист: {sheet_name}\n")
+
+        # Заголовок таблицы (первая строка)
+        header = normalized_rows[0]
+        header_cells = [str(cell) if cell is not None else '' for cell in header]
+        md_lines.append("| " + " | ".join(header_cells) + " |")
+
+        # Разделитель
+        md_lines.append("| " + " | ".join(["---"] * max_cols) + " |")
+
+        # Данные (остальные строки)
+        for row in normalized_rows[1:]:
+            row_cells = [str(cell) if cell is not None else '' for cell in row]
+            md_lines.append("| " + " | ".join(row_cells) + " |")
+
+        result_parts.append("\n".join(md_lines))
+
+    wb.close()
+
+    if not result_parts:
+        raise ValueError("Excel файл пустой или не содержит данных")
+
+    return "\n\n".join(result_parts)
 
 
 async def extract_pdf(content: bytes) -> str:
@@ -318,6 +381,7 @@ def get_file_summary(text: str, file_type: str, filename: str) -> str:
     type_names = {
         'document': 'документ',
         'pdf': 'PDF-документ',
+        'spreadsheet': 'таблица Excel',
         'text': 'текстовый файл',
         'image': 'изображение (OCR)',
         'audio': 'аудиозапись (транскрипция)'
