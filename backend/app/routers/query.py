@@ -165,6 +165,7 @@ class QueryRequest(BaseModel):
     messages: List[Message]
     mode: QueryMode = QueryMode.fast
     search_enabled: bool = True
+    file_context: Optional[str] = None  # Контекст файла (не сохраняется в историю)
 
 
 def get_session_from_token(authorization: str):
@@ -253,7 +254,12 @@ async def single_query(
 
             # Build messages for LLM
             messages = [{"role": "system", "content": system_prompt}]
-            messages.extend([{"role": m.role, "content": m.content} for m in request.messages])
+            for m in request.messages:
+                content = m.content
+                # Добавляем контекст файла к последнему сообщению пользователя
+                if m.role == "user" and m == request.messages[-1] and request.file_context:
+                    content = f"[Контекст загруженного файла]\n{request.file_context}\n\n[Вопрос пользователя]\n{m.content}"
+                messages.append({"role": m.role, "content": content})
 
             # Stream response from LLM
             for chunk in chat_completion_stream(model, messages, max_tokens=max_tokens):

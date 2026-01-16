@@ -67,7 +67,8 @@ export async function sendQuery(
   mode: QueryMode = "fast",
   searchEnabled: boolean = true,
   onChunk: (chunk: string) => void,
-  onStageUpdate?: (update: SingleQueryStageUpdate) => void
+  onStageUpdate?: (update: SingleQueryStageUpdate) => void,
+  fileContext?: string
 ): Promise<SingleQueryResult> {
   const res = await fetch(`${API_URL}/api/query/single`, {
     method: "POST",
@@ -75,7 +76,12 @@ export async function sendQuery(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ messages, mode, search_enabled: searchEnabled }),
+    body: JSON.stringify({
+      messages,
+      mode,
+      search_enabled: searchEnabled,
+      file_context: fileContext || null,
+    }),
   });
 
   if (!res.ok) {
