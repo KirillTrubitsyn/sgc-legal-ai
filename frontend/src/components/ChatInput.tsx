@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, KeyboardEvent } from "react";
+import { useState, useEffect } from "react";
 
 interface Props {
   onSend: (message: string) => void;
@@ -31,19 +31,11 @@ export default function ChatInput({
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
     <div className="flex gap-3">
       <textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
         rows={5}
