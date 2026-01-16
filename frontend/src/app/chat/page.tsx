@@ -141,13 +141,6 @@ export default function ChatPage() {
     setUploadedFile(result);
   };
 
-  const handleUseFileText = () => {
-    if (uploadedFile) {
-      setPendingText(uploadedFile.extracted_text);
-      setUploadedFile(null);
-    }
-  };
-
   const handleSend = async (content: string) => {
     if (isLoading) return;
 
@@ -359,7 +352,7 @@ export default function ChatPage() {
       {/* Chat Area */}
       <main className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
-          {messages.length === 0 && !streamingContent && !consiliumStage && !singleQueryStage && !uploadedFile ? (
+          {messages.length === 0 && !streamingContent && !consiliumStage && !singleQueryStage ? (
             <div className="text-center text-gray-500 mt-20">
               <p className="text-lg mb-2">
                 {mode === "single"
@@ -377,15 +370,6 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {/* Uploaded file preview */}
-              {uploadedFile && (
-                <FilePreview
-                  file={uploadedFile}
-                  onRemove={() => setUploadedFile(null)}
-                  onUseText={handleUseFileText}
-                />
-              )}
-
               {messages.map((item, idx) => {
                 if (isConsiliumMessage(item)) {
                   return (
@@ -498,6 +482,14 @@ export default function ChatPage() {
       {/* Input Area */}
       <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="max-w-4xl mx-auto">
+          {uploadedFile && (
+            <div className="mb-2">
+              <FilePreview
+                file={uploadedFile}
+                onRemove={() => setUploadedFile(null)}
+              />
+            </div>
+          )}
           <div className="flex gap-3 items-end">
             <FileUpload
               token={token}
@@ -517,11 +509,6 @@ export default function ChatPage() {
               />
             </div>
           </div>
-          {uploadedFile && (
-            <div className="mt-2 text-xs text-gray-400">
-              Файл загружен и будет включён в запрос
-            </div>
-          )}
         </div>
       </div>
     </div>
