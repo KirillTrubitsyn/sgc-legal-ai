@@ -215,7 +215,11 @@ def _clean_text_for_docx(text: str) -> str:
 
     # Split inline numbered lists onto separate lines (e.g., "1. Text 2. Text" -> "1. Text\n2. Text")
     # This handles cases where conclusions are on one line
-    text = re.sub(r'(\S)\s+(\d+)\.\s+', r'\1\n\2. ', text)
+    # Match any non-space character followed by space and a number with period
+    text = re.sub(r'([.,:;!?])\s+(\d+)\.\s+', r'\1\n\n\2. ', text)
+
+    # Remove markdown bold markers **text** -> text (keep only section headers bold)
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
 
     # Remove trailing empty lines
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -418,28 +422,11 @@ def _add_plain_text(paragraph, text: str):
 
 
 def _add_inline_formatting(paragraph, text: str):
-    """Add text with inline markdown formatting converted to DOCX bold/italic"""
-    # Pattern to find **bold** and *italic* segments
-    pattern = r'(\*\*[^*]+\*\*|\*[^*]+\*)'
-    parts = re.split(pattern, text)
+    """Add plain text without markdown formatting (bold only for section headers)"""
+    # Remove any remaining markdown bold/italic markers
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
 
-    for part in parts:
-        if not part:
-            continue
-
-        if part.startswith('**') and part.endswith('**'):
-            # Bold text
-            content = part[2:-2]
-            run = paragraph.add_run(content)
-            run.bold = True
-        elif part.startswith('*') and part.endswith('*'):
-            # Italic text
-            content = part[1:-1]
-            run = paragraph.add_run(content)
-            run.italic = True
-        else:
-            # Regular text
-            run = paragraph.add_run(part)
-
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(11)
+    run = paragraph.add_run(text)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(11)
