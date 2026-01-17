@@ -19,7 +19,8 @@ from app.database import (
     save_response,
     get_saved_responses,
     delete_saved_response,
-    save_usage_stat
+    save_usage_stat,
+    save_chat_message_to_session
 )
 import time
 from app.services.openrouter import chat_completion_stream
@@ -166,6 +167,7 @@ class QueryRequest(BaseModel):
     mode: QueryMode = QueryMode.fast
     search_enabled: bool = True
     file_context: Optional[str] = None  # Контекст файла (не сохраняется в историю)
+    chat_session_id: Optional[str] = None  # ID сессии чата (для новой системы истории)
 
 
 def get_session_from_token(authorization: str):
@@ -222,7 +224,10 @@ async def single_query(
 
     # Save user message
     if user_query:
-        save_chat_message(user_id, "user", user_query, model)
+        if request.chat_session_id:
+            save_chat_message_to_session(user_id, request.chat_session_id, "user", user_query, model)
+        else:
+            save_chat_message(user_id, "user", user_query, model)
 
     async def generate():
         full_response = ""
@@ -275,7 +280,10 @@ async def single_query(
 
             # Save assistant response
             if full_response:
-                save_chat_message(user_id, "assistant", full_response, model)
+                if request.chat_session_id:
+                    save_chat_message_to_session(user_id, request.chat_session_id, "assistant", full_response, model)
+                else:
+                    save_chat_message(user_id, "assistant", full_response, model)
 
         except Exception as e:
             success = False

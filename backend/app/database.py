@@ -480,6 +480,195 @@ def reset_invite_code(code_id: str, uses: int = 1) -> bool:
         return False
 
 
+# Chat sessions functions (history with invite code binding)
+
+MAX_CHAT_SESSIONS = 20  # Maximum number of chat sessions per invite code
+
+
+def get_invite_code_id_by_user(user_id: str) -> Optional[str]:
+    """Get invite_code_id for a user"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/users",
+            params={"id": f"eq.{user_id}", "select": "invite_code_id"}
+        )
+        response.raise_for_status()
+        data = response.json()
+        if data and data[0].get("invite_code_id"):
+            return data[0]["invite_code_id"]
+        return None
+    except Exception as e:
+        print(f"get_invite_code_id_by_user error: {e}")
+        return None
+
+
+def create_chat_session(invite_code_id: str, title: str = "Новый чат") -> Optional[Dict]:
+    """Create a new chat session for an invite code"""
+    try:
+        client = get_client()
+        response = client.post(
+            "/chat_sessions",
+            json={
+                "invite_code_id": invite_code_id,
+                "title": title
+            }
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"create_chat_session error: {e}")
+        return None
+
+
+def get_chat_sessions(invite_code_id: str) -> list:
+    """Get all chat sessions for an invite code, ordered by updated_at desc"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/chat_sessions",
+            params={
+                "invite_code_id": f"eq.{invite_code_id}",
+                "select": "*",
+                "order": "updated_at.desc"
+            }
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"get_chat_sessions error: {e}")
+        return []
+
+
+def get_chat_session(session_id: str) -> Optional[Dict]:
+    """Get a single chat session by ID"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/chat_sessions",
+            params={"id": f"eq.{session_id}", "select": "*"}
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data[0] if data else None
+    except Exception as e:
+        print(f"get_chat_session error: {e}")
+        return None
+
+
+def update_chat_session_title(session_id: str, title: str) -> bool:
+    """Update chat session title"""
+    try:
+        client = get_client()
+        response = client.patch(
+            "/chat_sessions",
+            params={"id": f"eq.{session_id}"},
+            json={"title": title}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"update_chat_session_title error: {e}")
+        return False
+
+
+def delete_chat_session(session_id: str) -> bool:
+    """Delete a chat session and all its messages (cascade)"""
+    try:
+        client = get_client()
+        response = client.delete(
+            "/chat_sessions",
+            params={"id": f"eq.{session_id}"}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"delete_chat_session error: {e}")
+        return False
+
+
+def delete_all_chat_sessions(invite_code_id: str) -> bool:
+    """Delete all chat sessions for an invite code"""
+    try:
+        client = get_client()
+        response = client.delete(
+            "/chat_sessions",
+            params={"invite_code_id": f"eq.{invite_code_id}"}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"delete_all_chat_sessions error: {e}")
+        return False
+
+
+def get_chat_sessions_count(invite_code_id: str) -> int:
+    """Get count of chat sessions for an invite code"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/chat_sessions",
+            params={
+                "invite_code_id": f"eq.{invite_code_id}",
+                "select": "id"
+            }
+        )
+        response.raise_for_status()
+        return len(response.json())
+    except Exception as e:
+        print(f"get_chat_sessions_count error: {e}")
+        return 0
+
+
+def save_chat_message_to_session(
+    user_id: str,
+    chat_session_id: str,
+    role: str,
+    content: str,
+    model: str = None
+) -> Optional[Dict]:
+    """Save a chat message to a specific session"""
+    try:
+        client = get_client()
+        data = {
+            "user_id": user_id,
+            "chat_session_id": chat_session_id,
+            "role": role,
+            "content": content
+        }
+        if model:
+            data["model"] = model
+
+        response = client.post("/chat_messages", json=data)
+        response.raise_for_status()
+        result = response.json()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"save_chat_message_to_session error: {e}")
+        return None
+
+
+def get_chat_session_messages(chat_session_id: str, limit: int = 100) -> list:
+    """Get messages for a specific chat session"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/chat_messages",
+            params={
+                "chat_session_id": f"eq.{chat_session_id}",
+                "select": "*",
+                "order": "created_at.asc",
+                "limit": str(limit)
+            }
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"get_chat_session_messages error: {e}")
+        return []
+
+
 # Usage stats functions
 
 def save_usage_stat(
