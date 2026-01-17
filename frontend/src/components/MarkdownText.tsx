@@ -9,8 +9,8 @@ interface Props {
 export default function MarkdownText({ content }: Props) {
   // Clean content before rendering
   const cleanContent = (text: string): string => {
-    // Remove "АНАЛИТИЧЕСКАЯ СПРАВКА" - either as header on its own line, or as inline prefix
-    text = text.replace(/^[\s]*АНАЛИТИЧЕСКАЯ СПРАВКА[:\s]*/gim, '');
+    // Remove "АНАЛИТИЧЕСКАЯ СПРАВКА" anywhere in text (with optional colon and spaces after)
+    text = text.replace(/АНАЛИТИЧЕСКАЯ СПРАВКА[:\s]*/gi, '');
     text = text.replace(/^[\s]*ПРАВОВОЕ ЗАКЛЮЧЕНИЕ[^\n]*\n?/gim, '');
 
     // Remove --- separators
