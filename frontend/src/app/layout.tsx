@@ -10,12 +10,12 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   icons: {
     icon: [
-      { url: "/favicon.svg?v=2", type: "image/svg+xml" },
-      { url: "/favicon-96.png?v=2", sizes: "96x96", type: "image/png" },
-      { url: "/favicon-32.ico?v=2", sizes: "32x32" },
+      { url: "/favicon.svg?v=3", type: "image/svg+xml" },
+      { url: "/favicon-96.png?v=3", sizes: "96x96", type: "image/png" },
+      { url: "/favicon-32.ico?v=3", sizes: "32x32" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" },
     ],
   },
   appleWebApp: {
