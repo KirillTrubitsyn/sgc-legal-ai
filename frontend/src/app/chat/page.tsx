@@ -34,7 +34,7 @@ import VerifiedCasesDisplay from "@/components/VerifiedCasesDisplay";
 import VerifiedNpaDisplay from "@/components/VerifiedNpaDisplay";
 import FilePreview from "@/components/FilePreview";
 import PhotoPreview from "@/components/PhotoPreview";
-import MediaInput from "@/components/MediaInput";
+import { FileButton, CameraButton, VoiceButton } from "@/components/MobileInputButtons";
 
 type Mode = "single" | "consilium";
 
@@ -726,7 +726,7 @@ export default function ChatPage() {
             />
           )}
 
-          {/* Input with integrated media button */}
+          {/* Input with buttons like Perplexity */}
           <ChatInput
             onSend={handleSend}
             disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
@@ -736,18 +736,26 @@ export default function ChatPage() {
                 ? "Вопрос по фото..."
                 : uploadedFile
                   ? "Вопрос по файлу..."
-                  : "Введите вопрос..."
+                  : "Спросите что угодно..."
             }
-            leftContent={
-              <MediaInput
-                token={token}
-                onFileProcessed={handleFileProcessed}
-                onPhotoCapture={handlePhotoCapture}
-                onVoiceTranscript={handleVoiceTranscript}
-                disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
-                maxPhotos={MAX_PHOTOS}
-                currentPhotoCount={chatPhotoCount + capturedPhotos.length}
-              />
+            bottomLeftContent={
+              <>
+                <FileButton
+                  token={token}
+                  onFileProcessed={handleFileProcessed}
+                  disabled={isLoading}
+                />
+                <CameraButton
+                  onCapture={handlePhotoCapture}
+                  disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
+                  maxPhotos={MAX_PHOTOS}
+                  currentPhotoCount={chatPhotoCount + capturedPhotos.length}
+                />
+                <VoiceButton
+                  onTranscript={handleVoiceTranscript}
+                  disabled={isLoading}
+                />
+              </>
             }
           />
         </div>
