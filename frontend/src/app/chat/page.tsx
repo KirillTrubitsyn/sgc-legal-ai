@@ -32,8 +32,22 @@ import CourtPracticeProgress from "@/components/CourtPracticeProgress";
 import VerifiedCasesDisplay from "@/components/VerifiedCasesDisplay";
 import FileUpload from "@/components/FileUpload";
 import FilePreview from "@/components/FilePreview";
+import VoiceInput from "@/components/VoiceInput";
+import CameraCapture from "@/components/CameraCapture";
+import PhotoPreview from "@/components/PhotoPreview";
 
 type Mode = "single" | "consilium";
+
+// Photo item for camera capture
+interface PhotoItem {
+  file: File;
+  preview: string;
+  result?: FileUploadResult;
+  isProcessing?: boolean;
+  error?: string;
+}
+
+const MAX_PHOTOS = 5;
 
 interface ConsiliumMessage {
   type: "consilium";
@@ -64,7 +78,10 @@ export default function ChatPage() {
   const [singleQueryStage, setSingleQueryStage] = useState("");
   const [singleQueryMessage, setSingleQueryMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
+  const [capturedPhotos, setCapturedPhotos] = useState<PhotoItem[]>([]);
+  const [chatPhotoCount, setChatPhotoCount] = useState(0); // Track total photos in chat session
   const [pendingText, setPendingText] = useState("");
+  const [voiceInputText, setVoiceInputText] = useState("");
   const [continuedFromSaved, setContinuedFromSaved] = useState(false);
   // Chat session state
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
@@ -166,17 +183,100 @@ export default function ChatPage() {
     setUploadedFile(result);
   };
 
+  // Handle voice input transcript
+  const handleVoiceTranscript = (text: string) => {
+    setVoiceInputText(prev => prev ? prev + " " + text : text);
+  };
+
+  // Handle camera capture
+  const handlePhotoCapture = async (file: File) => {
+    if (chatPhotoCount >= MAX_PHOTOS) {
+      alert(`Максимум ${MAX_PHOTOS} фото в чате`);
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    const newPhoto: PhotoItem = {
+      file,
+      preview,
+      isProcessing: true
+    };
+
+    setCapturedPhotos(prev => [...prev, newPhoto]);
+
+    // Process photo through OCR
+    try {
+      const result = await import("@/lib/api").then(api => api.uploadFile(token, file));
+      setCapturedPhotos(prev =>
+        prev.map(p =>
+          p.file === file
+            ? { ...p, result, isProcessing: false }
+            : p
+        )
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Ошибка обработки";
+      setCapturedPhotos(prev =>
+        prev.map(p =>
+          p.file === file
+            ? { ...p, error: errorMessage, isProcessing: false }
+            : p
+        )
+      );
+    }
+  };
+
+  // Remove captured photo
+  const handleRemovePhoto = (index: number) => {
+    setCapturedPhotos(prev => {
+      const newPhotos = [...prev];
+      const removed = newPhotos.splice(index, 1)[0];
+      if (removed?.preview) {
+        URL.revokeObjectURL(removed.preview);
+      }
+      return newPhotos;
+    });
+  };
+
   const handleSend = async (content: string) => {
     if (isLoading) return;
 
     // Сохраняем контекст файла отдельно (не показывается в UI, только для LLM)
     let fileContext: string | undefined;
     let displayContent = content;
+
+    // Handle single uploaded file
     if (uploadedFile) {
       fileContext = `${uploadedFile.summary}\n\n${uploadedFile.extracted_text}`;
       displayContent = `📎 ${uploadedFile.summary.split("|")[0].trim()}\n\n${content}`;
       setUploadedFile(null);
     }
+
+    // Handle captured photos (OCR results)
+    const processedPhotos = capturedPhotos.filter(p => p.result && !p.error);
+    if (processedPhotos.length > 0) {
+      const photoContexts = processedPhotos.map((p, idx) =>
+        `[Фото ${idx + 1}]\n${p.result!.summary}\n\n${p.result!.extracted_text}`
+      ).join("\n\n---\n\n");
+
+      if (fileContext) {
+        fileContext = `${fileContext}\n\n---\n\n${photoContexts}`;
+      } else {
+        fileContext = photoContexts;
+      }
+
+      const photoCountText = processedPhotos.length === 1
+        ? "1 фото"
+        : `${processedPhotos.length} фото`;
+      displayContent = `📷 ${photoCountText} документов\n\n${content}`;
+
+      // Update total photo count in chat and clear captured photos
+      setChatPhotoCount(prev => prev + processedPhotos.length);
+      setCapturedPhotos([]);
+    }
+
+    // Clear voice input text
+    setVoiceInputText("");
 
     const userMessage: Message = { role: "user", content: displayContent };
     setMessages((prev) => [...prev, userMessage]);
@@ -324,6 +424,9 @@ export default function ChatPage() {
     setSingleQueryStage("");
     setSingleQueryMessage("");
     setUploadedFile(null);
+    setCapturedPhotos([]);
+    setChatPhotoCount(0);
+    setVoiceInputText("");
     setPendingText("");
   };
 
@@ -345,6 +448,9 @@ export default function ChatPage() {
       setSingleQueryStage("");
       setSingleQueryMessage("");
       setUploadedFile(null);
+      setCapturedPhotos([]);
+      setChatPhotoCount(0); // Reset photo count for loaded chat
+      setVoiceInputText("");
       setPendingText("");
     } catch (err) {
       console.error("Failed to load chat:", err);
@@ -360,6 +466,9 @@ export default function ChatPage() {
     setSingleQueryStage("");
     setSingleQueryMessage("");
     setUploadedFile(null);
+    setCapturedPhotos([]);
+    setChatPhotoCount(0);
+    setVoiceInputText("");
     setPendingText("");
   };
 
@@ -589,6 +698,7 @@ export default function ChatPage() {
       {/* Input Area */}
       <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="max-w-4xl mx-auto">
+          {/* File preview */}
           {uploadedFile && (
             <div className="mb-2">
               <FilePreview
@@ -597,24 +707,63 @@ export default function ChatPage() {
               />
             </div>
           )}
-          <div className="flex gap-3 items-end">
+
+          {/* Photos preview */}
+          {capturedPhotos.length > 0 && (
+            <PhotoPreview
+              photos={capturedPhotos}
+              onRemove={handleRemovePhoto}
+              maxPhotos={MAX_PHOTOS}
+            />
+          )}
+
+          {/* Input row */}
+          <div className="flex gap-2 sm:gap-3 items-end">
+            {/* File upload button */}
             <FileUpload
               token={token}
               onFileProcessed={handleFileProcessed}
               disabled={isLoading}
             />
+
+            {/* Camera button - mobile only */}
+            <div className="md:hidden">
+              <CameraCapture
+                onCapture={handlePhotoCapture}
+                disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
+                maxPhotos={MAX_PHOTOS}
+                currentPhotoCount={chatPhotoCount + capturedPhotos.length}
+              />
+            </div>
+
+            {/* Voice input button - mobile only */}
+            <div className="md:hidden">
+              <VoiceInput
+                onTranscript={handleVoiceTranscript}
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Text input */}
             <div className="flex-1">
               <ChatInput
                 onSend={handleSend}
-                disabled={isLoading}
-                initialValue={pendingText}
+                disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
+                initialValue={voiceInputText || pendingText}
                 placeholder={
-                  uploadedFile
-                    ? "Задайте вопрос по загруженному файлу..."
-                    : "Введите ваш вопрос..."
+                  capturedPhotos.length > 0
+                    ? "Задайте вопрос по фото документов..."
+                    : uploadedFile
+                      ? "Задайте вопрос по загруженному файлу..."
+                      : "Введите ваш вопрос..."
                 }
               />
             </div>
+          </div>
+
+          {/* Mobile hint */}
+          <div className="md:hidden mt-2 text-xs text-gray-500 text-center">
+            Микрофон для голоса | Камера для документов (до {MAX_PHOTOS} фото)
           </div>
         </div>
       </div>
