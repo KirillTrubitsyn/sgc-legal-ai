@@ -9,6 +9,12 @@ from datetime import datetime
 
 from app.services.openrouter import chat_completion
 from app.config import settings
+from app.services.npa_verification import (
+    extract_npa_references_regex,
+    verify_npa_references,
+    VerifiedNpa,
+    NPA_SEARCH_PROMPT_ADDITION
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,8 +95,9 @@ async def run_consilium(
     Этап 1: ПАРАЛЛЕЛЬНО:
             - 3 эксперта (Opus + GPT + Gemini) отвечают на вопрос
             - Perplexity ищет судебную практику
+            - Извлечение и верификация НПА
     Этап 2: Peer Review (Sonnet) - оценка экспертов с учётом найденной практики
-    Этап 3: Синтез (Opus) - финальное заключение с верифицированной практикой
+    Этап 3: Синтез (Opus) - финальное заключение с верифицированной практикой и НПА
     """
     result = {
         "question": question,
@@ -98,16 +105,19 @@ async def run_consilium(
         "stages": {},
         "final_answer": None,
         "verified_cases": [],
+        "verified_npa": [],
         "total_tokens": 0
     }
 
-    # Стадия 1: Параллельно - эксперты отвечают + Perplexity ищет практику
+    # Стадия 1: Параллельно - эксперты отвечают + Perplexity ищет практику + верификация НПА
     if on_stage_update:
-        await on_stage_update("stage_1", "Сбор мнений экспертов и поиск судебной практики...")
+        await on_stage_update("stage_1", "Сбор мнений экспертов, поиск судебной практики и верификация НПА...")
 
-    opinions, search_results = await stage_1_parallel_gather(question)
+    opinions, search_results, verified_npa = await stage_1_parallel_gather(question)
     result["stages"]["stage_1"] = opinions
     result["stages"]["search"] = search_results  # Результаты поиска Perplexity
+    result["stages"]["npa"] = [npa.to_dict() for npa in verified_npa] if verified_npa else []
+    result["verified_npa"] = [npa.to_dict() for npa in verified_npa] if verified_npa else []
 
     # Стадия 2: Peer Review с учётом найденной практики
     if on_stage_update:
@@ -118,11 +128,11 @@ async def run_consilium(
     result["stages"]["stage_4"] = review_data.get("reviews", {})
     result["verified_cases"] = review_data.get("cases", [])
 
-    # Стадия 3: Финальный синтез с верифицированной практикой
+    # Стадия 3: Финальный синтез с верифицированной практикой и НПА
     if on_stage_update:
         await on_stage_update("stage_3", "Формирование итогового ответа...")
 
-    final = await stage_3_final_synthesis(question, opinions, review_data, search_results)
+    final = await stage_3_final_synthesis(question, opinions, review_data, search_results, verified_npa)
     result["final_answer"] = final
     result["stages"]["stage_5"] = {"synthesis": final}
 
@@ -131,12 +141,13 @@ async def run_consilium(
     return result
 
 
-async def stage_1_parallel_gather(question: str) -> tuple[Dict[str, Any], Dict[str, Any]]:
+async def stage_1_parallel_gather(question: str) -> tuple[Dict[str, Any], Dict[str, Any], List[VerifiedNpa]]:
     """
-    Стадия 1: ПАРАЛЛЕЛЬНЫЙ сбор мнений экспертов + поиск судебной практики
+    Стадия 1: ПАРАЛЛЕЛЬНЫЙ сбор мнений экспертов + поиск судебной практики + верификация НПА
 
     Эксперты (Opus, GPT, Gemini) отвечают на юридический вопрос
     Perplexity параллельно ищет релевантную судебную практику в интернете
+    Извлекаются и верифицируются ссылки на НПА из вопроса
     """
     # Промпт для экспертов (юридическое заключение)
     expert_system_prompt = """Вы — эксперт-юрист по российскому праву, составляющий правовое заключение.
@@ -181,7 +192,10 @@ async def stage_1_parallel_gather(question: str) -> tuple[Dict[str, Any], Dict[s
 
     search_messages = [{"role": "user", "content": search_prompt}]
 
-    # Запускаем ПАРАЛЛЕЛЬНО: 3 эксперта + 1 поисковик
+    # Извлекаем ссылки на НПА из вопроса для последующей верификации
+    npa_references = extract_npa_references_regex(question)
+
+    # Запускаем ПАРАЛЛЕЛЬНО: 3 эксперта + 1 поисковик + верификация НПА
     expert_roles = ["chairman", "expert_1", "expert_2"]
     tasks = []
 
@@ -192,6 +206,15 @@ async def stage_1_parallel_gather(question: str) -> tuple[Dict[str, Any], Dict[s
 
     # Задача поисковика (Perplexity)
     tasks.append(get_search_results(CONSILIUM_MODELS["searcher"], search_messages))
+
+    # Задача верификации НПА (если есть ссылки)
+    async def empty_npa_list():
+        return []
+
+    if npa_references:
+        tasks.append(verify_npa_references(npa_references, max_concurrent=2))
+    else:
+        tasks.append(empty_npa_list())
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -216,7 +239,7 @@ async def stage_1_parallel_gather(question: str) -> tuple[Dict[str, Any], Dict[s
                 "error": False
             }
 
-    # Разбираем результат поиска (последний)
+    # Разбираем результат поиска (индекс 3)
     search_result = results[3]
     if isinstance(search_result, Exception):
         search_results = {
@@ -231,7 +254,15 @@ async def stage_1_parallel_gather(question: str) -> tuple[Dict[str, Any], Dict[s
             "error": False
         }
 
-    return opinions, search_results
+    # Разбираем результат верификации НПА (индекс 4)
+    npa_result = results[4]
+    if isinstance(npa_result, Exception):
+        logger.error(f"NPA verification error: {npa_result}")
+        verified_npa = []
+    else:
+        verified_npa = npa_result if npa_result else []
+
+    return opinions, search_results, verified_npa
 
 
 async def get_search_results(model_id: str, messages: List[Dict]) -> Dict:
@@ -370,11 +401,12 @@ async def stage_3_final_synthesis(
     question: str,
     opinions: Dict[str, Any],
     review_data: Dict[str, Any],
-    search_results: Dict[str, Any] = None
+    search_results: Dict[str, Any] = None,
+    verified_npa: List[VerifiedNpa] = None
 ) -> str:
     """
     Стадия 3: Финальный синтез (Claude Opus 4.5)
-    Создаёт единое заключение с верифицированной судебной практикой
+    Создаёт единое заключение с верифицированной судебной практикой и НПА
     """
     cases = review_data.get("cases", [])
     reviews = review_data.get("reviews", {})
@@ -384,6 +416,27 @@ async def stage_3_final_synthesis(
     search_content = ""
     if search_results and not search_results.get("error"):
         search_content = search_results.get("content", "")
+
+    # Форматируем информацию о верифицированных НПА
+    npa_content = ""
+    if verified_npa:
+        npa_lines = []
+        for npa in verified_npa:
+            status_label = {
+                "VERIFIED": "ДЕЙСТВУЕТ",
+                "AMENDED": "ИЗМЕНЕНА",
+                "REPEALED": "УТРАТИЛА СИЛУ",
+                "NOT_FOUND": "НЕ НАЙДЕНА"
+            }.get(npa.status, npa.status)
+            line = f"- {npa.reference.raw_reference}: {status_label}"
+            if npa.current_text:
+                line += f" | Текст: {npa.current_text[:150]}..."
+            if npa.amendment_info:
+                line += f" | Изменения: {npa.amendment_info}"
+            if npa.repeal_info:
+                line += f" | Утрата силы: {npa.repeal_info}"
+            npa_lines.append(line)
+        npa_content = "\n".join(npa_lines)
 
     synthesis_prompt = f"""Ты — председатель юридического консилиума. Твоя задача — создать ЕДИНОЕ итоговое правовое заключение на основе мнений 3 экспертов и найденной судебной практики.
 
@@ -422,7 +475,10 @@ async def stage_3_final_synthesis(
     else:
         synthesis_prompt += "Не найдено.\n"
 
-    synthesis_prompt += """
+    synthesis_prompt += f"""
+
+=== ВЕРИФИЦИРОВАННЫЕ НПА ===
+{npa_content if npa_content else "Ссылки на НПА не верифицировались."}
 
 ТВОЯ ЗАДАЧА — написать ЕДИНОЕ заключение.
 

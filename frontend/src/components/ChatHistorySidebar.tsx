@@ -361,10 +361,10 @@ export default function ChatHistorySidebar({
 
   return (
     <>
-      {/* Toggle Button - always visible on right edge */}
+      {/* Toggle Button - visible only on desktop (md+), hidden on mobile */}
       <button
         onClick={() => onToggle(!isOpen)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-50 bg-sgc-orange hover:bg-orange-500 text-white shadow-lg rounded-l-lg"
+        className="hidden md:block fixed right-0 top-1/2 -translate-y-1/2 z-50 bg-sgc-orange hover:bg-orange-500 text-white shadow-lg rounded-l-lg"
         title={isOpen ? "Скрыть историю" : "История чатов"}
       >
         <div className="flex flex-col items-center py-4 px-2">
