@@ -676,16 +676,16 @@ export default function AdminPage() {
                 {/* Recent Activity */}
                 <div className="bg-gray-800 rounded-lg p-6">
                   <h3 className="text-lg font-semibold mb-4">
-                    Последняя активность
+                    Последняя активность ({stats.recent.length})
                   </h3>
                   {stats.recent.length === 0 ? (
                     <div className="text-gray-500 text-sm">Нет данных</div>
                   ) : (
-                    <div className="space-y-2">
-                      {stats.recent.slice(0, 10).map((item, idx) => (
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                      {stats.recent.map((item, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center gap-2 text-sm"
+                          className="flex items-center gap-2 text-sm border-b border-gray-700/50 pb-2"
                         >
                           <span
                             className={
@@ -694,12 +694,20 @@ export default function AdminPage() {
                           >
                             {item.success ? "✓" : "✗"}
                           </span>
-                          <span className="text-gray-300 truncate">
+                          <span className="text-gray-300 truncate flex-1">
                             {item.user_name}
                           </span>
                           <span className="text-gray-500">→</span>
                           <span className="text-gray-400 truncate">
                             {item.request_type}
+                          </span>
+                          <span className="text-gray-500 text-xs ml-auto whitespace-nowrap">
+                            {new Date(item.created_at).toLocaleString("ru-RU", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
                         </div>
                       ))}
