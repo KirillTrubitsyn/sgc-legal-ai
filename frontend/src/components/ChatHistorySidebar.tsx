@@ -156,7 +156,7 @@ export default function ChatHistorySidebar({
   const panelContent = (
     <>
       {/* Header */}
-      <div className="p-4 border-b border-sgc-blue-600 bg-sgc-blue-700 shrink-0">
+      <div className="p-4 border-b border-sgc-blue-600 shrink-0" style={{ backgroundColor: '#0f2240' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Кнопка назад для мобильной версии */}
@@ -387,7 +387,10 @@ export default function ChatHistorySidebar({
 
       {/* Mobile: Full-screen overlay */}
       {isOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-sgc-blue-800 flex flex-col">
+        <div
+          className="md:hidden fixed inset-0 z-[100] flex flex-col"
+          style={{ backgroundColor: '#0a1628' }}
+        >
           {panelContent}
         </div>
       )}
