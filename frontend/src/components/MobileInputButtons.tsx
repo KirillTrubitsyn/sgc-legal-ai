@@ -195,9 +195,9 @@ export function CameraButton({ onCapture, disabled, maxPhotos = 5, currentPhotoC
           </div>
 
           {/* Capture button - with safe area for iPhone */}
-          <div className="p-4 pb-8 flex justify-center bg-black/50">
-            <button onClick={capture} disabled={!ready} className={`w-18 h-18 rounded-full border-4 border-white flex items-center justify-center ${!ready ? "opacity-50" : "active:scale-95"} transition-transform`} style={{ width: 72, height: 72 }}>
-              <div className="w-14 h-14 rounded-full bg-white"/>
+          <div className="p-4 flex justify-center bg-black/50" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}>
+            <button onClick={capture} disabled={!ready} className={`rounded-full border-4 border-white flex items-center justify-center ${!ready ? "opacity-50" : "active:scale-95"} transition-transform`} style={{ width: 72, height: 72 }}>
+              <div className="rounded-full bg-white" style={{ width: 56, height: 56 }}/>
             </button>
           </div>
           <canvas ref={canvasRef} className="hidden"/>
