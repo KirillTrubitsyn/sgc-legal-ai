@@ -201,8 +201,8 @@ def _clean_text_for_docx(text: str) -> str:
     # Remove "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ" header anywhere in text (on its own line)
     text = re.sub(r'^[\s]*ПРАВОВОЕ ЗАКЛЮЧЕНИЕ[^\n]*\n?', '', text, flags=re.MULTILINE | re.IGNORECASE)
 
-    # Remove "АНАЛИТИЧЕСКАЯ СПРАВКА" - either as header on its own line, or as inline prefix
-    text = re.sub(r'^[\s]*АНАЛИТИЧЕСКАЯ СПРАВКА[:\s]*', '', text, flags=re.MULTILINE | re.IGNORECASE)
+    # Remove "АНАЛИТИЧЕСКАЯ СПРАВКА" anywhere in text (with optional colon and spaces after)
+    text = re.sub(r'АНАЛИТИЧЕСКАЯ СПРАВКА[:\s]*', '', text, flags=re.IGNORECASE)
 
     # Remove "Председатель юридического консилиума" and similar signatures
     text = re.sub(r'^Председатель\s+(юридического\s+)?консилиума.*$', '', text, flags=re.MULTILINE | re.IGNORECASE)
