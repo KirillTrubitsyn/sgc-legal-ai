@@ -53,8 +53,10 @@ export default function ChatHistorySidebar({
     setError(null);
     try {
       const data = await getChatSessions(token);
-      setChats(data.chats);
-      setCount(data.count);
+      // Фильтруем пустые чаты с дефолтным названием "Новый чат"
+      const filteredChats = data.chats.filter(chat => chat.title !== "Новый чат");
+      setChats(filteredChats);
+      setCount(filteredChats.length);
       setLimit(data.limit);
     } catch (err) {
       console.error("Failed to load chats:", err);
