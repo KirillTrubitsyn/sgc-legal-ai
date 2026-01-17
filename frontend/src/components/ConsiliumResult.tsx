@@ -121,6 +121,68 @@ export default function ConsiliumResult({ result, token }: Props) {
         </div>
       )}
 
+      {/* Верифицированные НПА */}
+      {result.verified_npa && result.verified_npa.length > 0 && (
+        <div className="bg-sgc-blue-700 rounded-xl p-4">
+          <button
+            onClick={() => toggleSection("npa")}
+            className="w-full flex justify-between items-center text-left"
+          >
+            <h3 className="text-md font-semibold text-blue-400">
+              [V] Нормативно-правовые акты ({result.verified_npa.length})
+            </h3>
+            <span>{expandedSection === "npa" ? "v" : ">"}</span>
+          </button>
+
+          {expandedSection === "npa" && (
+            <div className="mt-3 space-y-2">
+              {result.verified_npa.map((npa, i) => {
+                const statusColor = {
+                  VERIFIED: "text-green-400",
+                  AMENDED: "text-yellow-400",
+                  REPEALED: "text-red-400",
+                  NOT_FOUND: "text-gray-400",
+                }[npa.status] || "text-gray-400";
+
+                const statusLabel = {
+                  VERIFIED: "Действует",
+                  AMENDED: "Изменена",
+                  REPEALED: "Утратила силу",
+                  NOT_FOUND: "Не найдена",
+                }[npa.status] || npa.status;
+
+                return (
+                  <div key={i} className="bg-sgc-blue-500/50 rounded-lg p-3">
+                    <div className="font-medium text-white">{npa.raw_reference}</div>
+                    {npa.act_name && npa.act_name !== npa.raw_reference && (
+                      <div className="text-sm text-gray-300">{npa.act_name}</div>
+                    )}
+                    {npa.current_text && (
+                      <div className="text-sm text-gray-400 mt-1 italic">
+                        {npa.current_text}
+                      </div>
+                    )}
+                    {npa.amendment_info && (
+                      <div className="text-sm text-yellow-300 mt-1">
+                        Изменения: {npa.amendment_info}
+                      </div>
+                    )}
+                    {npa.repeal_info && (
+                      <div className="text-sm text-red-300 mt-1">
+                        Утрата силы: {npa.repeal_info}
+                      </div>
+                    )}
+                    <div className={`text-xs mt-1 ${statusColor}`}>
+                      Статус: {statusLabel}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Мнения экспертов */}
       <div className="bg-sgc-blue-700 rounded-xl p-4">
         <button

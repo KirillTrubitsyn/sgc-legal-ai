@@ -55,10 +55,11 @@ export interface SingleQueryStageUpdate {
   message?: string;
 }
 
-// Result of single query including verified cases
+// Result of single query including verified cases and NPA
 export interface SingleQueryResult {
   content: string;
   verifiedCases: CourtPracticeCase[];
+  verifiedNpa: VerifiedNpa[];
 }
 
 export async function sendQuery(
@@ -98,6 +99,7 @@ export async function sendQuery(
 
   let fullContent = "";
   let verifiedCases: CourtPracticeCase[] = [];
+  let verifiedNpa: VerifiedNpa[] = [];
 
   try {
     while (true) {
@@ -111,7 +113,7 @@ export async function sendQuery(
         if (line.startsWith("data: ")) {
           const data = line.slice(6);
           if (data === "[DONE]") {
-            return { content: fullContent, verifiedCases };
+            return { content: fullContent, verifiedCases, verifiedNpa };
           }
 
           try {
@@ -127,7 +129,7 @@ export async function sendQuery(
               throw new Error(errorMsg);
             }
 
-            // Handle stage updates (search, extract, verify, generating)
+            // Handle stage updates (search, extract, verify, npa_verify, generating)
             if (parsed.stage && onStageUpdate) {
               const stageMessage = typeof parsed.message === 'string'
                 ? parsed.message
@@ -139,6 +141,12 @@ export async function sendQuery(
             // Handle verified_cases at the end
             if (parsed.verified_cases) {
               verifiedCases = parsed.verified_cases;
+              continue;
+            }
+
+            // Handle verified_npa at the end
+            if (parsed.verified_npa) {
+              verifiedNpa = parsed.verified_npa;
               continue;
             }
 
@@ -167,7 +175,7 @@ export async function sendQuery(
     throw err;
   }
 
-  return { content: fullContent, verifiedCases };
+  return { content: fullContent, verifiedCases, verifiedNpa };
 }
 
 // Consilium types and functions
@@ -182,9 +190,11 @@ export interface ConsiliumResult {
     stage_3: VerifiedCase[];
     stage_4: PeerReview;
     stage_5: { synthesis: string };
+    npa?: VerifiedNpa[];
   };
   final_answer: string;
   verified_cases: VerifiedCase[];
+  verified_npa?: VerifiedNpa[];
 }
 
 export interface ModelOpinion {
@@ -894,6 +904,26 @@ export interface CourtPracticeCase {
     actual_info?: string;
     [key: string]: unknown;
   };
+}
+
+// NPA (Normative Legal Acts) verification types
+
+export interface VerifiedNpa {
+  act_type: string;  // Тип акта: ГК, УК, ФЗ, и т.д.
+  act_name: string;  // Полное название акта
+  article: string;   // Номер статьи
+  part?: string;     // Часть статьи
+  paragraph?: string;  // Пункт статьи
+  subparagraph?: string;  // Подпункт
+  raw_reference: string;  // Исходная ссылка в тексте
+  status: "VERIFIED" | "AMENDED" | "REPEALED" | "NOT_FOUND";
+  is_active: boolean;
+  current_text?: string;
+  verification_source: string;
+  amendment_info?: string;
+  repeal_info?: string;
+  sources: string[];
+  confidence: "high" | "medium" | "low";
 }
 
 // Web Search API functions (Perplexity)

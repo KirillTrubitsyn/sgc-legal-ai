@@ -10,6 +10,7 @@ import {
   StageUpdate,
   FileUploadResult,
   CourtPracticeCase,
+  VerifiedNpa,
   SingleQueryStageUpdate,
   saveResponse,
   QueryMode,
@@ -30,6 +31,7 @@ import ConsiliumProgress from "@/components/ConsiliumProgress";
 import ConsiliumResultComponent from "@/components/ConsiliumResult";
 import CourtPracticeProgress from "@/components/CourtPracticeProgress";
 import VerifiedCasesDisplay from "@/components/VerifiedCasesDisplay";
+import VerifiedNpaDisplay from "@/components/VerifiedNpaDisplay";
 import FileUpload from "@/components/FileUpload";
 import FilePreview from "@/components/FilePreview";
 
@@ -40,11 +42,12 @@ interface ConsiliumMessage {
   result: ConsiliumResult;
 }
 
-// Single query result with verified cases
+// Single query result with verified cases and NPA
 interface SingleResultMessage {
   type: "single_result";
   content: string;
   verifiedCases: CourtPracticeCase[];
+  verifiedNpa: VerifiedNpa[];
 }
 
 type ChatItem = Message | ConsiliumMessage | SingleResultMessage;
@@ -224,18 +227,22 @@ export default function ChatPage() {
         setSingleQueryMessage("");
         setStreamingContent("");
 
-        // Если есть верифицированные дела, показываем результат с делами
-        if (result.verifiedCases && result.verifiedCases.length > 0) {
+        // Если есть верифицированные дела или НПА, показываем результат с ними
+        const hasVerifiedCases = result.verifiedCases && result.verifiedCases.length > 0;
+        const hasVerifiedNpa = result.verifiedNpa && result.verifiedNpa.length > 0;
+
+        if (hasVerifiedCases || hasVerifiedNpa) {
           setMessages((prev) => [
             ...prev,
             {
               type: "single_result",
               content: result.content,
-              verifiedCases: result.verifiedCases,
+              verifiedCases: result.verifiedCases || [],
+              verifiedNpa: result.verifiedNpa || [],
             },
           ]);
         } else {
-          // Если дел нет, показываем как обычное сообщение
+          // Если дел и НПА нет, показываем как обычное сообщение
           setMessages((prev) => [
             ...prev,
             { role: "assistant", content: result.content },
@@ -515,6 +522,10 @@ export default function ChatPage() {
                       {/* Verified cases */}
                       {item.verifiedCases.length > 0 && (
                         <VerifiedCasesDisplay cases={item.verifiedCases} />
+                      )}
+                      {/* Verified NPA */}
+                      {item.verifiedNpa.length > 0 && (
+                        <VerifiedNpaDisplay npa={item.verifiedNpa} />
                       )}
                     </div>
                   );

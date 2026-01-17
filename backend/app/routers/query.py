@@ -26,6 +26,11 @@ import time
 from app.services.openrouter import chat_completion_stream
 from app.services.docx_generator import create_response_docx
 from app.services import perplexity
+from app.services.npa_verification import (
+    extract_npa_references_regex,
+    verify_npa_references,
+    NPA_SEARCH_PROMPT_ADDITION
+)
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
@@ -135,6 +140,9 @@ LEGAL_SYSTEM_PROMPT_WITH_CASES = """Ты — опытный российский
 ВЕРИФИЦИРОВАННАЯ СУДЕБНАЯ ПРАКТИКА:
 {verified_cases}
 
+ВЕРИФИЦИРОВАННЫЕ НОРМАТИВНО-ПРАВОВЫЕ АКТЫ:
+{verified_npa}
+
 ПРАВИЛА РАБОТЫ С СУДЕБНОЙ ПРАКТИКОЙ:
 
 - Используй в ответе ТОЛЬКО дела со статусом VERIFIED — они проверены через официальные базы
@@ -143,6 +151,13 @@ LEGAL_SYSTEM_PROMPT_WITH_CASES = """Ты — опытный российский
 - Цитируй позиции судов, опираясь на информацию из верифицированных дел
 - Дела со статусом LIKELY_EXISTS можно упоминать с оговоркой о необходимости проверки
 - При ссылке на дело указывай: номер, суд, суть правовой позиции
+
+ПРАВИЛА РАБОТЫ С НПА:
+
+- НПА со статусом VERIFIED — действуют в текущей редакции, можно ссылаться без оговорок
+- НПА со статусом AMENDED — были изменены, укажи актуальную редакцию
+- НПА со статусом REPEALED — утратили силу, укажи это явно при ссылке
+- Если нет информации о верификации — используй стандартные ссылки (ст. 333 ГК РФ)
 
 ПРИНЦИПЫ:
 
@@ -234,6 +249,7 @@ async def single_query(
     async def generate():
         full_response = ""
         search_results = ""
+        verified_npa_list = []
         start_time = time.time()
         success = True
         error_msg = None
@@ -244,18 +260,53 @@ async def single_query(
                 yield f"data: {json.dumps({'stage': 'search', 'message': 'Поиск актуальной информации...'}, ensure_ascii=False)}\n\n"
 
                 try:
-                    search_results = perplexity.search(user_query)
+                    search_results = perplexity.search(user_query + NPA_SEARCH_PROMPT_ADDITION)
                     yield f"data: {json.dumps({'stage': 'search_complete', 'message': 'Поиск завершён'}, ensure_ascii=False)}\n\n"
                 except Exception as e:
                     yield f"data: {json.dumps({'stage': 'search_error', 'message': f'Ошибка поиска: {str(e)}'}, ensure_ascii=False)}\n\n"
                     search_results = ""
 
+            # Stage 1.5: Extract and verify NPA from user query
+            npa_references = extract_npa_references_regex(user_query)
+            if npa_references:
+                yield f"data: {json.dumps({'stage': 'npa_verify', 'message': f'Верификация {len(npa_references)} НПА...'}, ensure_ascii=False)}\n\n"
+                try:
+                    verified_npa_list = await verify_npa_references(npa_references, max_concurrent=2)
+                    yield f"data: {json.dumps({'stage': 'npa_verify_complete', 'message': 'Верификация НПА завершена'}, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'stage': 'npa_verify_error', 'message': f'Ошибка верификации НПА: {str(e)}'}, ensure_ascii=False)}\n\n"
+                    verified_npa_list = []
+
             # Stage 2: Generate response
             yield f"data: {json.dumps({'stage': 'generating', 'message': 'Генерация ответа...'}, ensure_ascii=False)}\n\n"
 
+            # Format verified NPA for system prompt
+            npa_info = "Информация о НПА не запрашивалась."
+            if verified_npa_list:
+                npa_lines = []
+                for npa in verified_npa_list:
+                    status_label = {
+                        "VERIFIED": "ДЕЙСТВУЕТ",
+                        "AMENDED": "ИЗМЕНЕНА",
+                        "REPEALED": "УТРАТИЛА СИЛУ",
+                        "NOT_FOUND": "НЕ НАЙДЕНА"
+                    }.get(npa.status, npa.status)
+                    line = f"- {npa.reference.raw_reference}: {status_label}"
+                    if npa.current_text:
+                        line += f"\n  Текст: {npa.current_text[:200]}..."
+                    if npa.amendment_info:
+                        line += f"\n  Изменения: {npa.amendment_info}"
+                    if npa.repeal_info:
+                        line += f"\n  Утрата силы: {npa.repeal_info}"
+                    npa_lines.append(line)
+                npa_info = "\n".join(npa_lines)
+
             # Build system prompt
-            if search_results:
-                system_prompt = LEGAL_SYSTEM_PROMPT_WITH_CASES.format(verified_cases=search_results)
+            if search_results or verified_npa_list:
+                system_prompt = LEGAL_SYSTEM_PROMPT_WITH_CASES.format(
+                    verified_cases=search_results if search_results else "Судебная практика не запрашивалась.",
+                    verified_npa=npa_info
+                )
             else:
                 system_prompt = LEGAL_SYSTEM_PROMPT
 
@@ -277,6 +328,11 @@ async def single_query(
                     full_response += delta
                 except:
                     pass
+
+            # Send verified NPA to frontend
+            if verified_npa_list:
+                npa_data = [npa.to_dict() for npa in verified_npa_list]
+                yield f"data: {json.dumps({'verified_npa': npa_data}, ensure_ascii=False)}\n\n"
 
             yield "data: [DONE]\n\n"
 
