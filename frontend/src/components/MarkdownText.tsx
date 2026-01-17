@@ -9,8 +9,8 @@ interface Props {
 export default function MarkdownText({ content }: Props) {
   // Clean content before rendering
   const cleanContent = (text: string): string => {
-    // Remove duplicate headers (anywhere in text, on their own line)
-    text = text.replace(/^[\s]*АНАЛИТИЧЕСКАЯ СПРАВКА[^\n]*\n?/gim, '');
+    // Remove "АНАЛИТИЧЕСКАЯ СПРАВКА" - either as header on its own line, or as inline prefix
+    text = text.replace(/^[\s]*АНАЛИТИЧЕСКАЯ СПРАВКА[:\s]*/gim, '');
     text = text.replace(/^[\s]*ПРАВОВОЕ ЗАКЛЮЧЕНИЕ[^\n]*\n?/gim, '');
 
     // Remove --- separators
