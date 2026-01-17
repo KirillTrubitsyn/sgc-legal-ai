@@ -8,14 +8,18 @@ interface Props {
 const STAGES = [
   { id: "search", name: "Поиск", icon: "🔍" },
   { id: "search_complete", name: "Найдено", icon: "✅" },
+  { id: "npa_verify", name: "НПА", icon: "📋" },
+  { id: "npa_verify_complete", name: "НПА ✓", icon: "✅" },
   { id: "generating", name: "Ответ", icon: "📝" },
 ];
 
 export default function CourtPracticeProgress({ currentStage, message }: Props) {
-  // Handle search_error as a variant of search stage
-  const normalizedStage = currentStage === "search_error" ? "search_complete" : currentStage;
+  // Handle error stages as completed variants
+  const normalizedStage = currentStage === "search_error" ? "search_complete"
+    : currentStage === "npa_verify_error" ? "npa_verify_complete"
+    : currentStage;
   const currentIndex = STAGES.findIndex((s) => s.id === normalizedStage);
-  const isError = currentStage === "search_error";
+  const isError = currentStage === "search_error" || currentStage === "npa_verify_error";
 
   return (
     <div className="bg-sgc-blue-700 rounded-xl p-6 mb-4">
