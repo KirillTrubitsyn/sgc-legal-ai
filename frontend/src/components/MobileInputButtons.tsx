@@ -192,17 +192,12 @@ export function CameraButton({ onCapture, disabled, maxPhotos = 5, currentPhotoC
                 {!ready && <div className="absolute inset-0 flex items-center justify-center bg-black"><div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"/></div>}
               </>
             )}
-            <div className="absolute inset-8 border-2 border-white/30 rounded-lg pointer-events-none">
-              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"/>
-              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"/>
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"/>
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"/>
-            </div>
           </div>
 
-          <div className="p-6 flex justify-center">
-            <button onClick={capture} disabled={!ready} className={`w-16 h-16 rounded-full border-4 border-white flex items-center justify-center ${!ready ? "opacity-50" : "active:scale-95"} transition-transform`}>
-              <div className="w-12 h-12 rounded-full bg-white"/>
+          {/* Capture button - with safe area for iPhone */}
+          <div className="p-4 pb-8 flex justify-center bg-black/50">
+            <button onClick={capture} disabled={!ready} className={`w-18 h-18 rounded-full border-4 border-white flex items-center justify-center ${!ready ? "opacity-50" : "active:scale-95"} transition-transform`} style={{ width: 72, height: 72 }}>
+              <div className="w-14 h-14 rounded-full bg-white"/>
             </button>
           </div>
           <canvas ref={canvasRef} className="hidden"/>
