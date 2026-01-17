@@ -306,7 +306,7 @@ export default function AdminPage() {
                 Создать инвайт-код
               </h2>
               <form onSubmit={handleCreateCode} className="space-y-4">
-                {/* Row 1: Name, Uses, Code, Button */}
+                {/* Row 1: Name, Code, Description */}
                 <div className="grid grid-cols-12 gap-4 items-end">
                   <div className="col-span-4">
                     <label className="block text-gray-400 text-xs mb-1">
@@ -321,19 +321,7 @@ export default function AdminPage() {
                       required
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-gray-400 text-xs mb-1">
-                      Использований
-                    </label>
-                    <input
-                      type="number"
-                      value={newUses}
-                      onChange={(e) => setNewUses(parseInt(e.target.value) || 1)}
-                      min={1}
-                      className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
-                    />
-                  </div>
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <label className="block text-gray-400 text-xs mb-1">
                       Код (авто)
                     </label>
@@ -346,7 +334,7 @@ export default function AdminPage() {
                       maxLength={12}
                     />
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-5">
                     <label className="block text-gray-400 text-xs mb-1">
                       Кто это / заметки
                     </label>
