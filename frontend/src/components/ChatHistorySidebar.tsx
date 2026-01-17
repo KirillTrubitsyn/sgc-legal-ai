@@ -171,8 +171,8 @@ export default function ChatHistorySidebar({
 
       {/* Sidebar Panel */}
       <div
-        className={`h-full bg-sgc-blue-800 border-l border-sgc-blue-600 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
-          isOpen ? "w-72" : "w-0"
+        className={`min-h-screen bg-sgc-blue-800 border-l border-sgc-blue-500 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
+          isOpen ? "w-72" : "w-0 border-l-0"
         }`}
       >
         {/* Header */}
