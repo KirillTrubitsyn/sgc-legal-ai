@@ -54,10 +54,10 @@ export default function ChatMessage({ role, content, onSave, question, model, to
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 group`}>
       <div
-        className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+        className={`px-4 py-3 rounded-2xl ${
           isUser
-            ? "bg-sgc-orange-500 text-white rounded-br-md"
-            : "bg-sgc-blue-700 text-gray-100 rounded-bl-md"
+            ? "max-w-[85%] bg-sgc-orange-500 text-white rounded-br-md"
+            : "w-full sm:max-w-[85%] bg-sgc-blue-700 text-gray-100 rounded-bl-md"
         }`}
       >
         {isUser ? (
