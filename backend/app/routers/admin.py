@@ -248,3 +248,45 @@ async def get_stats(
     """Get usage statistics for the admin panel"""
     stats = get_usage_stats(days=days)
     return UsageStatsResponse(**stats)
+
+
+@router.get("/health")
+async def admin_health_check(token: str = Depends(verify_admin_token)):
+    """Check Supabase connectivity for debugging"""
+    import httpx
+    from app.config import settings
+
+    results = {
+        "supabase_url": settings.supabase_url[:30] + "..." if settings.supabase_url else "NOT SET",
+        "service_key_set": bool(settings.supabase_service_key),
+        "service_key_length": len(settings.supabase_service_key) if settings.supabase_service_key else 0,
+    }
+
+    # Try to connect to Supabase
+    try:
+        client = httpx.Client(
+            base_url=f"{settings.supabase_url}/rest/v1",
+            headers={
+                "apikey": settings.supabase_service_key,
+                "Authorization": f"Bearer {settings.supabase_service_key}",
+            },
+            timeout=10.0
+        )
+
+        # Test invite_codes table
+        response = client.get("/invite_codes", params={"select": "count", "limit": "1"})
+        results["invite_codes_status"] = response.status_code
+        results["invite_codes_response"] = response.text[:200] if response.status_code != 200 else "OK"
+
+        # Test users table
+        response = client.get("/users", params={"select": "count", "limit": "1"})
+        results["users_status"] = response.status_code
+        results["users_response"] = response.text[:200] if response.status_code != 200 else "OK"
+
+        client.close()
+        results["connection"] = "OK"
+    except Exception as e:
+        results["connection"] = "FAILED"
+        results["error"] = f"{type(e).__name__}: {str(e)}"
+
+    return results

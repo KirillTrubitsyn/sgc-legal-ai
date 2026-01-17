@@ -395,12 +395,17 @@ def get_invite_codes_with_users() -> Dict[str, Any]:
     try:
         client = get_client()
         # Get invite codes
+        print(f"[DEBUG] Fetching invite codes from {settings.supabase_url}/rest/v1/invite_codes")
         codes_response = client.get(
             "/invite_codes",
             params={"select": "*", "order": "created_at.desc"}
         )
+        print(f"[DEBUG] invite_codes response status: {codes_response.status_code}")
+        if codes_response.status_code != 200:
+            print(f"[DEBUG] invite_codes response body: {codes_response.text[:500]}")
         codes_response.raise_for_status()
         codes = codes_response.json()
+        print(f"[DEBUG] Found {len(codes)} invite codes")
 
         # Get users for each code
         for code in codes:
@@ -415,9 +420,13 @@ def get_invite_codes_with_users() -> Dict[str, Any]:
             code["users"] = users_response.json()
 
         return {"codes": codes, "error": None}
+    except httpx.HTTPStatusError as e:
+        error_msg = f"HTTP {e.response.status_code}: {e.response.text[:200]}"
+        print(f"[ERROR] get_invite_codes_with_users HTTP error: {error_msg}")
+        return {"codes": [], "error": error_msg}
     except Exception as e:
-        error_msg = str(e)
-        print(f"get_invite_codes_with_users error: {error_msg}")
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"[ERROR] get_invite_codes_with_users error: {error_msg}")
         return {"codes": [], "error": error_msg}
 
 
