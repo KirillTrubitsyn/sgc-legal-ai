@@ -383,25 +383,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
-      {/* Chat History Sidebar */}
-      {token && (
-        <ChatHistorySidebar
-          token={token}
-          currentChatId={currentChatSession?.id || null}
-          onSelectChat={handleSelectChat}
-          onNewChat={handleNewChat}
-          onChatCreated={handleChatCreated}
-          isOpen={isSidebarOpen}
-          onToggle={setIsSidebarOpen}
-        />
-      )}
-
-      {/* Main Content - shifts left when sidebar is open */}
-      <div
-        className="flex flex-col flex-1 transition-all duration-300 ease-in-out"
-        style={{ marginRight: isSidebarOpen ? '320px' : '0px' }}
-      >
+    <div className="min-h-screen flex">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
       {/* Header */}
       <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto gap-2">
@@ -625,7 +609,19 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-      </div> {/* End of main content wrapper */}
+      </div> {/* End of main content */}
+
+      {/* Chat History Sidebar */}
+      {token && (
+        <ChatHistorySidebar
+          token={token}
+          currentChatId={currentChatSession?.id || null}
+          onSelectChat={handleSelectChat}
+          onNewChat={handleNewChat}
+          isOpen={isSidebarOpen}
+          onToggle={setIsSidebarOpen}
+        />
+      )}
     </div>
   );
 }

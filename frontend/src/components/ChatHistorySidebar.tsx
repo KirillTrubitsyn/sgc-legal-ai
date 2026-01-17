@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  Plus,
   MessageSquare,
   Pencil,
   Trash2,
@@ -10,11 +9,11 @@ import {
   Check,
   AlertCircle,
   History,
+  ChevronRight,
 } from "lucide-react";
 import {
   ChatSession,
   getChatSessions,
-  createChatSession,
   renameChatSession,
   deleteChatSession,
   deleteAllChatSessions,
@@ -25,7 +24,6 @@ interface ChatHistorySidebarProps {
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
-  onChatCreated: (chat: ChatSession) => void;
   isOpen: boolean;
   onToggle: (open: boolean) => void;
 }
@@ -35,14 +33,12 @@ export default function ChatHistorySidebar({
   currentChatId,
   onSelectChat,
   onNewChat,
-  onChatCreated,
   isOpen,
   onToggle,
 }: ChatHistorySidebarProps) {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [count, setCount] = useState(0);
   const [limit, setLimit] = useState(20);
-  const [canCreate, setCanCreate] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -60,7 +56,6 @@ export default function ChatHistorySidebar({
       setChats(data.chats);
       setCount(data.count);
       setLimit(data.limit);
-      setCanCreate(data.can_create);
     } catch (err) {
       console.error("Failed to load chats:", err);
       setError("Не удалось загрузить историю");
@@ -81,24 +76,6 @@ export default function ChatHistorySidebar({
       editInputRef.current.select();
     }
   }, [editingChatId]);
-
-  const handleCreateChat = async () => {
-    if (!canCreate) {
-      setError(`Достигнут лимит чатов (${limit}). Удалите старые чаты.`);
-      return;
-    }
-
-    try {
-      const data = await createChatSession(token);
-      setChats((prev) => [data.chat, ...prev]);
-      setCount(data.count);
-      setCanCreate(data.count < data.limit);
-      onChatCreated(data.chat);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Ошибка создания чата";
-      setError(errorMessage);
-    }
-  };
 
   const handleRename = async (chatId: string) => {
     if (!editTitle.trim()) {
@@ -125,7 +102,6 @@ export default function ChatHistorySidebar({
       await deleteChatSession(token, chatId);
       setChats((prev) => prev.filter((chat) => chat.id !== chatId));
       setCount((prev) => prev - 1);
-      setCanCreate(true);
       setShowDeleteConfirm(null);
 
       if (chatId === currentChatId) {
@@ -142,7 +118,6 @@ export default function ChatHistorySidebar({
       await deleteAllChatSessions(token);
       setChats([]);
       setCount(0);
-      setCanCreate(true);
       setShowClearConfirm(false);
       onNewChat();
     } catch (err) {
@@ -170,124 +145,103 @@ export default function ChatHistorySidebar({
 
   return (
     <>
-      {/* Toggle Button - visible orange tab on right edge */}
+      {/* Toggle Button - always visible on right edge */}
       <button
         onClick={() => onToggle(!isOpen)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-sgc-orange hover:bg-orange-500 text-white shadow-lg transition-all rounded-l-lg overflow-hidden"
-        style={{
-          right: isOpen ? '320px' : '0px',
-          transition: 'right 0.3s ease-in-out'
-        }}
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-50 bg-sgc-orange hover:bg-orange-500 text-white shadow-lg rounded-l-lg"
         title={isOpen ? "Скрыть историю" : "История чатов"}
       >
         <div className="flex flex-col items-center py-4 px-2">
-          <History size={22} className="mb-2" />
+          <History size={20} className="mb-1" />
           <span
-            className="text-xs font-bold tracking-wider"
+            className="text-[10px] font-bold uppercase tracking-wide"
             style={{
               writingMode: "vertical-rl",
               textOrientation: "mixed",
-              letterSpacing: "0.1em"
             }}
           >
-            ИСТОРИЯ
+            История
           </span>
+          <ChevronRight
+            size={14}
+            className={`mt-1 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          />
         </div>
       </button>
 
-      {/* Sidebar */}
+      {/* Sidebar Panel */}
       <div
-        className={`fixed right-0 top-0 h-full z-20 bg-sgc-blue-800 border-l-2 border-sgc-orange shadow-2xl transition-transform duration-300 ease-in-out ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        } w-80 flex flex-col`}
+        className={`h-full bg-sgc-blue-800 border-l border-sgc-blue-600 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
+          isOpen ? "w-72" : "w-0"
+        }`}
       >
         {/* Header */}
-        <div className="p-4 border-b border-sgc-blue-600 bg-sgc-blue-700">
-          <div className="flex items-center justify-between mb-3">
+        <div className="p-4 border-b border-sgc-blue-600 bg-sgc-blue-700 shrink-0">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <History size={20} className="text-sgc-orange" />
-              <h2 className="text-white font-semibold text-lg">История чатов</h2>
+              <History size={18} className="text-sgc-orange" />
+              <h2 className="text-white font-semibold">История чатов</h2>
             </div>
             <button
               onClick={() => onToggle(false)}
               className="text-gray-400 hover:text-white p-1 hover:bg-sgc-blue-600 rounded"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
-          {/* New Chat Button */}
-          <button
-            onClick={handleCreateChat}
-            disabled={!canCreate}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium transition-colors ${
-              canCreate
-                ? "bg-sgc-orange hover:bg-orange-500 text-white"
-                : "bg-gray-600 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            <Plus size={20} />
-            <span>Новый чат</span>
-          </button>
-
           {/* Counter */}
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <div className="h-1.5 flex-1 bg-sgc-blue-900 rounded-full overflow-hidden">
+          <div className="mt-3 flex items-center gap-2">
+            <div className="h-1 flex-1 bg-sgc-blue-900 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all ${count >= limit ? 'bg-red-500' : 'bg-sgc-orange'}`}
                 style={{ width: `${(count / limit) * 100}%` }}
               />
             </div>
-            <span className="text-sm text-gray-400 whitespace-nowrap">
-              {count} / {limit}
+            <span className="text-xs text-gray-400 whitespace-nowrap">
+              {count}/{limit}
             </span>
           </div>
-          {!canCreate && (
-            <p className="text-yellow-500 text-xs text-center mt-1">
-              Лимит достигнут
-            </p>
-          )}
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mx-4 mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-start gap-2">
-            <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
-            <span className="text-red-300 text-sm flex-1">{error}</span>
+          <div className="mx-3 mt-3 p-2 bg-red-500/20 border border-red-500/50 rounded-lg flex items-start gap-2 shrink-0">
+            <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+            <span className="text-red-300 text-xs flex-1">{error}</span>
             <button
               onClick={() => setError(null)}
               className="text-red-400 hover:text-red-300 shrink-0"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
         )}
 
         {/* Chat List */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto p-2">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-sgc-orange border-t-transparent" />
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-sgc-orange border-t-transparent" />
             </div>
           ) : chats.length === 0 ? (
-            <div className="text-center text-gray-500 py-12">
-              <MessageSquare size={48} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">Нет сохранённых чатов</p>
-              <p className="text-xs mt-1 text-gray-600">Начните новый диалог</p>
+            <div className="text-center text-gray-500 py-8">
+              <MessageSquare size={36} className="mx-auto mb-2 opacity-40" />
+              <p className="text-xs">Нет сохранённых чатов</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {chats.map((chat) => (
                 <div
                   key={chat.id}
                   className={`group relative rounded-lg transition-all ${
                     chat.id === currentChatId
-                      ? "bg-sgc-blue-600 ring-2 ring-sgc-orange/50"
-                      : "bg-sgc-blue-700/50 hover:bg-sgc-blue-700"
+                      ? "bg-sgc-orange/20 border border-sgc-orange/50"
+                      : "hover:bg-sgc-blue-700"
                   }`}
                 >
                   {editingChatId === chat.id ? (
-                    <div className="flex items-center gap-2 p-3">
+                    <div className="flex items-center gap-1 p-2">
                       <input
                         ref={editInputRef}
                         type="text"
@@ -297,80 +251,73 @@ export default function ChatHistorySidebar({
                           if (e.key === "Enter") handleRename(chat.id);
                           if (e.key === "Escape") setEditingChatId(null);
                         }}
-                        className="flex-1 bg-sgc-blue-900 text-white text-sm px-3 py-1.5 rounded border border-sgc-blue-500 focus:outline-none focus:border-sgc-orange"
+                        className="flex-1 bg-sgc-blue-900 text-white text-xs px-2 py-1 rounded border border-sgc-blue-500 focus:outline-none focus:border-sgc-orange"
                       />
                       <button
                         onClick={() => handleRename(chat.id)}
-                        className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-500/20 rounded"
+                        className="p-1 text-green-400 hover:text-green-300"
                       >
-                        <Check size={18} />
+                        <Check size={14} />
                       </button>
                       <button
                         onClick={() => setEditingChatId(null)}
-                        className="p-1.5 text-gray-400 hover:text-gray-300 hover:bg-gray-500/20 rounded"
+                        className="p-1 text-gray-400 hover:text-gray-300"
                       >
-                        <X size={18} />
+                        <X size={14} />
                       </button>
                     </div>
                   ) : showDeleteConfirm === chat.id ? (
-                    <div className="p-3">
-                      <p className="text-sm text-gray-300 mb-3">Удалить этот чат?</p>
-                      <div className="flex gap-2">
+                    <div className="p-2">
+                      <p className="text-xs text-gray-300 mb-2">Удалить?</p>
+                      <div className="flex gap-1">
                         <button
                           onClick={() => handleDelete(chat.id)}
-                          className="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-white text-sm rounded-lg font-medium"
+                          className="flex-1 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
                         >
-                          Удалить
+                          Да
                         </button>
                         <button
                           onClick={() => setShowDeleteConfirm(null)}
-                          className="flex-1 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded-lg"
+                          className="flex-1 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded"
                         >
-                          Отмена
+                          Нет
                         </button>
                       </div>
                     </div>
                   ) : (
                     <button
-                      onClick={() => {
-                        onSelectChat(chat.id);
-                      }}
-                      className="w-full text-left p-3 pr-20"
+                      onClick={() => onSelectChat(chat.id)}
+                      className="w-full text-left p-2 pr-14"
                     >
-                      <div className="flex items-start gap-2">
-                        <MessageSquare size={16} className="text-gray-500 mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm text-white truncate font-medium">{chat.title}</div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {formatDate(chat.updated_at)}
-                          </div>
-                        </div>
+                      <div className="text-xs text-white truncate">{chat.title}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">
+                        {formatDate(chat.updated_at)}
                       </div>
                     </button>
                   )}
 
                   {!editingChatId && !showDeleteConfirm && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditTitle(chat.title);
                           setEditingChatId(chat.id);
                         }}
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-sgc-blue-500 rounded"
+                        className="p-1 text-gray-400 hover:text-white hover:bg-sgc-blue-600 rounded"
                         title="Переименовать"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={12} />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowDeleteConfirm(chat.id);
                         }}
-                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/20 rounded"
+                        className="p-1 text-gray-400 hover:text-red-400 hover:bg-red-500/20 rounded"
                         title="Удалить"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   )}
@@ -382,22 +329,22 @@ export default function ChatHistorySidebar({
 
         {/* Footer - Clear All */}
         {chats.length > 0 && (
-          <div className="p-4 border-t border-sgc-blue-600 bg-sgc-blue-700/50">
+          <div className="p-3 border-t border-sgc-blue-600 shrink-0">
             {showClearConfirm ? (
               <div>
-                <p className="text-sm text-gray-300 mb-3 text-center">
+                <p className="text-xs text-gray-300 mb-2 text-center">
                   Удалить все {count} чатов?
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={handleClearAll}
-                    className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-sm rounded-lg font-medium"
+                    className="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
                   >
-                    Удалить все
+                    Удалить
                   </button>
                   <button
                     onClick={() => setShowClearConfirm(false)}
-                    className="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded-lg"
+                    className="flex-1 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded"
                   >
                     Отмена
                   </button>
@@ -406,10 +353,10 @@ export default function ChatHistorySidebar({
             ) : (
               <button
                 onClick={() => setShowClearConfirm(true)}
-                className="w-full py-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 text-sm flex items-center justify-center gap-2 rounded-lg transition-colors"
+                className="w-full py-1.5 text-gray-500 hover:text-red-400 text-xs flex items-center justify-center gap-1 rounded transition-colors"
               >
-                <Trash2 size={16} />
-                <span>Очистить всю историю</span>
+                <Trash2 size={12} />
+                <span>Очистить историю</span>
               </button>
             )}
           </div>
