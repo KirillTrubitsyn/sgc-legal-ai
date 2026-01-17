@@ -32,6 +32,7 @@ export default function AdminPage() {
   // Stats state
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [statsDays, setStatsDays] = useState(30);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"codes" | "stats">("codes");
 
   // Expanded rows for showing users
@@ -74,6 +75,7 @@ export default function AdminPage() {
 
   const loadStats = async () => {
     if (!token) return;
+    setStatsLoading(true);
     try {
       const data = await getUsageStats(token, statsDays);
       setStats(data);
@@ -90,6 +92,8 @@ export default function AdminPage() {
         period_days: statsDays,
         error: err instanceof Error ? err.message : "Ошибка загрузки"
       });
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -536,16 +540,18 @@ export default function AdminPage() {
                 onChange={(e) => setStatsDays(parseInt(e.target.value))}
                 className="bg-gray-700 text-white rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
               >
+                <option value={1}>1 день</option>
                 <option value={7}>7 дней</option>
                 <option value={30}>30 дней</option>
                 <option value={90}>90 дней</option>
                 <option value={365}>1 год</option>
               </select>
               <button
-                onClick={loadStats}
-                className="text-sgc-orange-400 hover:text-sgc-orange-300 text-sm"
+                onClick={() => loadStats()}
+                disabled={statsLoading}
+                className="text-sgc-orange-400 hover:text-sgc-orange-300 disabled:text-gray-500 text-sm"
               >
-                Обновить
+                {statsLoading ? "Загрузка..." : "Обновить"}
               </button>
             </div>
 
