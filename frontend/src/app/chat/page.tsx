@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ModeSelector from "@/components/ModeSelector";
+import { History } from "lucide-react";
 import ModeToggle from "@/components/ModeToggle";
 import SearchToggle from "@/components/SearchToggle";
 import ChatMessage from "@/components/ChatMessage";
@@ -403,6 +404,14 @@ export default function ChatPage() {
             >
               Сохранённые
             </a>
+            {/* История - только на мобильных */}
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden text-gray-400 hover:text-sgc-orange p-1"
+              title="История чатов"
+            >
+              <History size={20} />
+            </button>
             <span className="text-gray-400 text-sm hidden sm:inline">
               {userName}
             </span>
