@@ -68,6 +68,7 @@ export default function ChatPage() {
   // Chat session state
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -391,9 +392,16 @@ export default function ChatPage() {
           onSelectChat={handleSelectChat}
           onNewChat={handleNewChat}
           onChatCreated={handleChatCreated}
+          isOpen={isSidebarOpen}
+          onToggle={setIsSidebarOpen}
         />
       )}
 
+      {/* Main Content - shifts left when sidebar is open */}
+      <div
+        className="flex flex-col flex-1 transition-all duration-300 ease-in-out"
+        style={{ marginRight: isSidebarOpen ? '320px' : '0px' }}
+      >
       {/* Header */}
       <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto gap-2">
@@ -617,6 +625,7 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+      </div> {/* End of main content wrapper */}
     </div>
   );
 }

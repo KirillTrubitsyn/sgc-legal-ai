@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
   Plus,
   MessageSquare,
   Pencil,
@@ -28,6 +26,8 @@ interface ChatHistorySidebarProps {
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onChatCreated: (chat: ChatSession) => void;
+  isOpen: boolean;
+  onToggle: (open: boolean) => void;
 }
 
 export default function ChatHistorySidebar({
@@ -36,8 +36,9 @@ export default function ChatHistorySidebar({
   onSelectChat,
   onNewChat,
   onChatCreated,
+  isOpen,
+  onToggle,
 }: ChatHistorySidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [count, setCount] = useState(0);
   const [limit, setLimit] = useState(20);
@@ -127,7 +128,6 @@ export default function ChatHistorySidebar({
       setCanCreate(true);
       setShowDeleteConfirm(null);
 
-      // If deleting current chat, trigger new chat
       if (chatId === currentChatId) {
         onNewChat();
       }
@@ -170,36 +170,34 @@ export default function ChatHistorySidebar({
 
   return (
     <>
-      {/* Toggle Button - visible tab on right edge */}
+      {/* Toggle Button - visible orange tab on right edge */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 py-3 px-2 rounded-l-xl shadow-lg transition-all ${
-          isOpen
-            ? "bg-sgc-blue-700 text-white"
-            : "bg-sgc-orange hover:bg-sgc-orange/90 text-white"
-        }`}
+        onClick={() => onToggle(!isOpen)}
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-sgc-orange hover:bg-orange-500 text-white shadow-lg transition-all rounded-l-lg overflow-hidden"
+        style={{
+          right: isOpen ? '320px' : '0px',
+          transition: 'right 0.3s ease-in-out'
+        }}
         title={isOpen ? "Скрыть историю" : "История чатов"}
       >
-        <div className="flex flex-col items-center gap-1">
-          <History size={20} />
-          <span className="text-xs font-medium writing-mode-vertical" style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
-            История
+        <div className="flex flex-col items-center py-4 px-2">
+          <History size={22} className="mb-2" />
+          <span
+            className="text-xs font-bold tracking-wider"
+            style={{
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+              letterSpacing: "0.1em"
+            }}
+          >
+            ИСТОРИЯ
           </span>
         </div>
-        {isOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
 
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Sidebar - slides from right */}
+      {/* Sidebar */}
       <div
-        className={`fixed right-0 top-0 h-full z-50 bg-sgc-blue-800 border-l border-sgc-blue-600 shadow-2xl transition-transform duration-300 ${
+        className={`fixed right-0 top-0 h-full z-20 bg-sgc-blue-800 border-l-2 border-sgc-orange shadow-2xl transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         } w-80 flex flex-col`}
       >
@@ -211,7 +209,7 @@ export default function ChatHistorySidebar({
               <h2 className="text-white font-semibold text-lg">История чатов</h2>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => onToggle(false)}
               className="text-gray-400 hover:text-white p-1 hover:bg-sgc-blue-600 rounded"
             >
               <X size={20} />
@@ -224,7 +222,7 @@ export default function ChatHistorySidebar({
             disabled={!canCreate}
             className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium transition-colors ${
               canCreate
-                ? "bg-sgc-orange hover:bg-sgc-orange/90 text-white"
+                ? "bg-sgc-orange hover:bg-orange-500 text-white"
                 : "bg-gray-600 text-gray-400 cursor-not-allowed"
             }`}
           >
@@ -289,7 +287,6 @@ export default function ChatHistorySidebar({
                   }`}
                 >
                   {editingChatId === chat.id ? (
-                    // Edit Mode
                     <div className="flex items-center gap-2 p-3">
                       <input
                         ref={editInputRef}
@@ -316,7 +313,6 @@ export default function ChatHistorySidebar({
                       </button>
                     </div>
                   ) : showDeleteConfirm === chat.id ? (
-                    // Delete Confirmation
                     <div className="p-3">
                       <p className="text-sm text-gray-300 mb-3">Удалить этот чат?</p>
                       <div className="flex gap-2">
@@ -335,14 +331,9 @@ export default function ChatHistorySidebar({
                       </div>
                     </div>
                   ) : (
-                    // Normal Mode
                     <button
                       onClick={() => {
                         onSelectChat(chat.id);
-                        // Close sidebar on mobile after selection
-                        if (window.innerWidth < 1024) {
-                          setIsOpen(false);
-                        }
                       }}
                       className="w-full text-left p-3 pr-20"
                     >
@@ -358,7 +349,6 @@ export default function ChatHistorySidebar({
                     </button>
                   )}
 
-                  {/* Action Buttons */}
                   {!editingChatId && !showDeleteConfirm && (
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
