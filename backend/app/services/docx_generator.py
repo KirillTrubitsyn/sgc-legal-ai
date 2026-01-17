@@ -213,6 +213,10 @@ def _clean_text_for_docx(text: str) -> str:
     # Remove --- separators
     text = re.sub(r'^---+\s*$', '', text, flags=re.MULTILINE)
 
+    # Split inline numbered lists onto separate lines (e.g., "1. Text 2. Text" -> "1. Text\n2. Text")
+    # This handles cases where conclusions are on one line
+    text = re.sub(r'(\S)\s+(\d+)\.\s+', r'\1\n\2. ', text)
+
     # Remove trailing empty lines
     text = re.sub(r'\n{3,}', '\n\n', text)
 
