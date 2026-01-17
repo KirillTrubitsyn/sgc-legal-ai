@@ -346,10 +346,10 @@ export default function MediaInput({
           disabled={disabled || isUploading}
           type="button"
           className={`
-            p-3 rounded-xl transition-colors relative
+            p-2 rounded-lg transition-colors relative
             ${isRecording
               ? "bg-red-500 text-white animate-pulse"
-              : "bg-sgc-blue-700 text-gray-300 hover:bg-sgc-blue-500"
+              : "text-gray-400 hover:text-white hover:bg-sgc-blue-500"
             }
             ${(disabled || isUploading) ? "opacity-50 cursor-not-allowed" : ""}
           `}
