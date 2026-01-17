@@ -68,7 +68,8 @@ export async function sendQuery(
   searchEnabled: boolean = true,
   onChunk: (chunk: string) => void,
   onStageUpdate?: (update: SingleQueryStageUpdate) => void,
-  fileContext?: string
+  fileContext?: string,
+  chatSessionId?: string
 ): Promise<SingleQueryResult> {
   const res = await fetch(`${API_URL}/api/query/single`, {
     method: "POST",
@@ -81,6 +82,7 @@ export async function sendQuery(
       mode,
       search_enabled: searchEnabled,
       file_context: fileContext || null,
+      chat_session_id: chatSessionId || null,
     }),
   });
 
@@ -395,7 +397,121 @@ export async function getSupportedFormats(): Promise<SupportedFormats> {
   return res.json();
 }
 
-// Chat history API functions
+// Chat Sessions API functions (new history system)
+
+export interface ChatSession {
+  id: string;
+  invite_code_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatSessionsResponse {
+  chats: ChatSession[];
+  count: number;
+  limit: number;
+  can_create: boolean;
+}
+
+export interface ChatSessionWithMessages {
+  chat: ChatSession;
+  messages: ChatHistoryMessage[];
+}
+
+export async function getChatSessions(token: string): Promise<ChatSessionsResponse> {
+  const res = await fetch(`${API_URL}/api/chats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch chat sessions");
+  }
+
+  return res.json();
+}
+
+export async function createChatSession(
+  token: string,
+  title?: string
+): Promise<{ chat: ChatSession; count: number; limit: number }> {
+  const res = await fetch(`${API_URL}/api/chats`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ title: title || "Новый чат" }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to create chat session");
+  }
+
+  return res.json();
+}
+
+export async function getChatSessionWithMessages(
+  token: string,
+  chatId: string
+): Promise<ChatSessionWithMessages> {
+  const res = await fetch(`${API_URL}/api/chats/${chatId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch chat session");
+  }
+
+  return res.json();
+}
+
+export async function renameChatSession(
+  token: string,
+  chatId: string,
+  title: string
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/chats/${chatId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to rename chat session");
+  }
+}
+
+export async function deleteChatSession(
+  token: string,
+  chatId: string
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/chats/${chatId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to delete chat session");
+  }
+}
+
+export async function deleteAllChatSessions(token: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/chats`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to clear chat history");
+  }
+}
+
+// Chat history API functions (legacy)
 
 export interface ChatHistoryMessage {
   id: string;
@@ -404,6 +520,7 @@ export interface ChatHistoryMessage {
   content: string;
   model?: string;
   created_at: string;
+  chat_session_id?: string;
 }
 
 export async function getChatHistory(token: string): Promise<ChatHistoryMessage[]> {

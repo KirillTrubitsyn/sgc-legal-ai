@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, query, consilium, files, admin
+from app.routers import auth, query, consilium, files, admin, chats
 
 app = FastAPI(
     title="SGC Legal AI",
@@ -26,6 +26,7 @@ app.include_router(query.router)
 app.include_router(consilium.router)
 app.include_router(files.router)
 app.include_router(admin.router)
+app.include_router(chats.router)
 
 
 @app.get("/health")

@@ -11,11 +11,14 @@ import {
   FileUploadResult,
   CourtPracticeCase,
   SingleQueryStageUpdate,
-  getChatHistory,
-  clearChatHistory,
   saveResponse,
   QueryMode,
+  ChatSession,
+  createChatSession,
+  getChatSessionWithMessages,
+  renameChatSession,
 } from "@/lib/api";
+import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ModeSelector from "@/components/ModeSelector";
 import ModeToggle from "@/components/ModeToggle";
 import SearchToggle from "@/components/SearchToggle";
@@ -62,6 +65,9 @@ export default function ChatPage() {
   const [uploadedFile, setUploadedFile] = useState<FileUploadResult | null>(null);
   const [pendingText, setPendingText] = useState("");
   const [continuedFromSaved, setContinuedFromSaved] = useState(false);
+  // Chat session state
+  const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -77,23 +83,32 @@ export default function ChatPage() {
     setToken(storedToken);
     setUserName(user || "Пользователь");
 
-    // Load chat history (only if not continuing from saved)
+    // Check if continuing from saved response
     const urlParams = new URLSearchParams(window.location.search);
     const isContinue = urlParams.get("continue") === "true";
+
     if (!isContinue) {
-      getChatHistory(storedToken)
-        .then((history) => {
-          if (history.length > 0) {
-            const loadedMessages: Message[] = history.map((m) => ({
-              role: m.role,
-              content: m.content,
-            }));
-            setMessages(loadedMessages);
-          }
-        })
-        .catch(console.error);
+      // Create a new chat session on entry
+      initializeNewChat(storedToken);
+    } else {
+      setIsInitializing(false);
     }
   }, [router]);
+
+  const initializeNewChat = async (authToken: string) => {
+    setIsInitializing(true);
+    try {
+      const data = await createChatSession(authToken);
+      setCurrentChatSession(data.chat);
+      setMessages([]);
+    } catch (err) {
+      console.error("Failed to create chat session:", err);
+      // Fallback: work without session
+      setCurrentChatSession(null);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   // Handle continue from saved response
   useEffect(() => {
@@ -105,23 +120,31 @@ export default function ChatPage() {
       if (savedContext && storedToken) {
         try {
           const context = JSON.parse(savedContext);
-          // Clear the history first for a fresh conversation with context
-          clearChatHistory(storedToken).then(() => {
-            // Add the saved Q&A as context
-            const contextMessages: Message[] = [
-              { role: "user", content: context.question },
-              { role: "assistant", content: context.answer },
-            ];
-            setMessages(contextMessages);
-            setContinuedFromSaved(true);
-            // Clean up after successful load
-            localStorage.removeItem("sgc_continue_chat");
-            // Remove query param from URL
-            window.history.replaceState({}, "", "/chat");
-          });
+          // Create a new chat session for this context
+          createChatSession(storedToken, "Продолжение: " + context.question.substring(0, 30) + "...")
+            .then((data) => {
+              setCurrentChatSession(data.chat);
+              // Add the saved Q&A as context
+              const contextMessages: Message[] = [
+                { role: "user", content: context.question },
+                { role: "assistant", content: context.answer },
+              ];
+              setMessages(contextMessages);
+              setContinuedFromSaved(true);
+              setIsInitializing(false);
+              // Clean up after successful load
+              localStorage.removeItem("sgc_continue_chat");
+              // Remove query param from URL
+              window.history.replaceState({}, "", "/chat");
+            })
+            .catch((err) => {
+              console.error("Failed to create chat session for continue:", err);
+              setIsInitializing(false);
+            });
         } catch (e) {
           console.error("Failed to parse continue chat context:", e);
           localStorage.removeItem("sgc_continue_chat");
+          setIsInitializing(false);
         }
       }
     }
@@ -158,6 +181,15 @@ export default function ChatPage() {
     setIsLoading(true);
     setPendingText("");
 
+    // Auto-rename chat on first message
+    if (messages.length === 0 && currentChatSession) {
+      const chatTitle = content.length > 40
+        ? content.substring(0, 40) + "..."
+        : content;
+      renameChatSession(token, currentChatSession.id, chatTitle).catch(console.error);
+      setCurrentChatSession({ ...currentChatSession, title: chatTitle });
+    }
+
     if (mode === "single") {
       // Single Query mode с поиском Perplexity
       setStreamingContent("");
@@ -182,7 +214,8 @@ export default function ChatPage() {
             setSingleQueryStage(update.stage);
             setSingleQueryMessage(update.message || "");
           },
-          fileContext
+          fileContext,
+          currentChatSession?.id
         );
 
         setSingleQueryStage("");
@@ -273,10 +306,52 @@ export default function ChatPage() {
   };
 
   const handleNewChat = async () => {
-    // Clear history in database
+    // Create a new chat session
     if (token) {
-      await clearChatHistory(token);
+      try {
+        const data = await createChatSession(token);
+        setCurrentChatSession(data.chat);
+      } catch (err) {
+        console.error("Failed to create new chat:", err);
+        // Show error or work without session
+      }
     }
+    setMessages([]);
+    setStreamingContent("");
+    setConsiliumStage("");
+    setSingleQueryStage("");
+    setSingleQueryMessage("");
+    setUploadedFile(null);
+    setPendingText("");
+  };
+
+  // Handle chat selection from sidebar
+  const handleSelectChat = async (chatId: string) => {
+    if (!token) return;
+
+    try {
+      const data = await getChatSessionWithMessages(token, chatId);
+      setCurrentChatSession(data.chat);
+      // Convert messages to the format expected by the chat
+      const loadedMessages: ChatItem[] = data.messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+      setMessages(loadedMessages);
+      setStreamingContent("");
+      setConsiliumStage("");
+      setSingleQueryStage("");
+      setSingleQueryMessage("");
+      setUploadedFile(null);
+      setPendingText("");
+    } catch (err) {
+      console.error("Failed to load chat:", err);
+    }
+  };
+
+  // Handle chat created from sidebar
+  const handleChatCreated = (chat: ChatSession) => {
+    setCurrentChatSession(chat);
     setMessages([]);
     setStreamingContent("");
     setConsiliumStage("");
@@ -294,8 +369,31 @@ export default function ChatPage() {
     return "type" in item && item.type === "single_result";
   };
 
+  // Show loading spinner while initializing
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-sgc-blue-800">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-sgc-orange border-t-transparent mx-auto mb-4" />
+          <p className="text-gray-400">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
+      {/* Chat History Sidebar */}
+      {token && (
+        <ChatHistorySidebar
+          token={token}
+          currentChatId={currentChatSession?.id || null}
+          onSelectChat={handleSelectChat}
+          onNewChat={handleNewChat}
+          onChatCreated={handleChatCreated}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto gap-2">
