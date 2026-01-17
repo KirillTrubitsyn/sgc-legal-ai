@@ -705,7 +705,7 @@ export default function ChatPage() {
       </main>
 
       {/* Input Area */}
-      <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
+      <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-2 sm:px-6 py-2 sm:py-4">
         <div className="max-w-4xl mx-auto">
           {/* File preview */}
           {uploadedFile && (
@@ -726,35 +726,30 @@ export default function ChatPage() {
             />
           )}
 
-          {/* Input row */}
-          <div className="flex gap-2 sm:gap-3 items-end">
-            {/* Media input (file, camera, voice) */}
-            <MediaInput
-              token={token}
-              onFileProcessed={handleFileProcessed}
-              onPhotoCapture={handlePhotoCapture}
-              onVoiceTranscript={handleVoiceTranscript}
-              disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
-              maxPhotos={MAX_PHOTOS}
-              currentPhotoCount={chatPhotoCount + capturedPhotos.length}
-            />
-
-            {/* Text input */}
-            <div className="flex-1">
-              <ChatInput
-                onSend={handleSend}
+          {/* Input with integrated media button */}
+          <ChatInput
+            onSend={handleSend}
+            disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
+            initialValue={voiceInputText || pendingText}
+            placeholder={
+              capturedPhotos.length > 0
+                ? "Вопрос по фото..."
+                : uploadedFile
+                  ? "Вопрос по файлу..."
+                  : "Введите вопрос..."
+            }
+            leftContent={
+              <MediaInput
+                token={token}
+                onFileProcessed={handleFileProcessed}
+                onPhotoCapture={handlePhotoCapture}
+                onVoiceTranscript={handleVoiceTranscript}
                 disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
-                initialValue={voiceInputText || pendingText}
-                placeholder={
-                  capturedPhotos.length > 0
-                    ? "Задайте вопрос по фото документов..."
-                    : uploadedFile
-                      ? "Задайте вопрос по загруженному файлу..."
-                      : "Введите ваш вопрос..."
-                }
+                maxPhotos={MAX_PHOTOS}
+                currentPhotoCount={chatPhotoCount + capturedPhotos.length}
               />
-            </div>
-          </div>
+            }
+          />
         </div>
       </div>
       </div> {/* End of main content */}
