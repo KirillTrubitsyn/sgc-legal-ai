@@ -571,8 +571,8 @@ def get_usage_stats(days: int = 30, limit: int = 1000) -> Dict[str, Any]:
                 by_user[user_name] = 0
             by_user[user_name] += 1
 
-        # Recent activity (last 10)
-        recent = stats[:10]
+        # Recent activity (all within period, up to 100)
+        recent = stats[:100]
 
         return {
             "total_requests": total_requests,

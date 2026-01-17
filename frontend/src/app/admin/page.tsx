@@ -32,6 +32,7 @@ export default function AdminPage() {
   // Stats state
   const [stats, setStats] = useState<UsageStats | null>(null);
   const [statsDays, setStatsDays] = useState(30);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"codes" | "stats">("codes");
 
   // Expanded rows for showing users
@@ -74,6 +75,7 @@ export default function AdminPage() {
 
   const loadStats = async () => {
     if (!token) return;
+    setStatsLoading(true);
     try {
       const data = await getUsageStats(token, statsDays);
       setStats(data);
@@ -90,6 +92,8 @@ export default function AdminPage() {
         period_days: statsDays,
         error: err instanceof Error ? err.message : "Ошибка загрузки"
       });
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -306,7 +310,7 @@ export default function AdminPage() {
                 Создать инвайт-код
               </h2>
               <form onSubmit={handleCreateCode} className="space-y-4">
-                {/* Row 1: Name, Uses, Code, Button */}
+                {/* Row 1: Name, Code, Description */}
                 <div className="grid grid-cols-12 gap-4 items-end">
                   <div className="col-span-4">
                     <label className="block text-gray-400 text-xs mb-1">
@@ -321,19 +325,7 @@ export default function AdminPage() {
                       required
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-gray-400 text-xs mb-1">
-                      Использований
-                    </label>
-                    <input
-                      type="number"
-                      value={newUses}
-                      onChange={(e) => setNewUses(parseInt(e.target.value) || 1)}
-                      min={1}
-                      className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
-                    />
-                  </div>
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <label className="block text-gray-400 text-xs mb-1">
                       Код (авто)
                     </label>
@@ -346,7 +338,7 @@ export default function AdminPage() {
                       maxLength={12}
                     />
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-5">
                     <label className="block text-gray-400 text-xs mb-1">
                       Кто это / заметки
                     </label>
@@ -548,16 +540,18 @@ export default function AdminPage() {
                 onChange={(e) => setStatsDays(parseInt(e.target.value))}
                 className="bg-gray-700 text-white rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sgc-orange-500"
               >
+                <option value={1}>1 день</option>
                 <option value={7}>7 дней</option>
                 <option value={30}>30 дней</option>
                 <option value={90}>90 дней</option>
                 <option value={365}>1 год</option>
               </select>
               <button
-                onClick={loadStats}
-                className="text-sgc-orange-400 hover:text-sgc-orange-300 text-sm"
+                onClick={() => loadStats()}
+                disabled={statsLoading}
+                className="text-sgc-orange-400 hover:text-sgc-orange-300 disabled:text-gray-500 text-sm"
               >
-                Обновить
+                {statsLoading ? "Загрузка..." : "Обновить"}
               </button>
             </div>
 
@@ -688,16 +682,16 @@ export default function AdminPage() {
                 {/* Recent Activity */}
                 <div className="bg-gray-800 rounded-lg p-6">
                   <h3 className="text-lg font-semibold mb-4">
-                    Последняя активность
+                    Последняя активность ({stats.recent.length})
                   </h3>
                   {stats.recent.length === 0 ? (
                     <div className="text-gray-500 text-sm">Нет данных</div>
                   ) : (
-                    <div className="space-y-2">
-                      {stats.recent.slice(0, 10).map((item, idx) => (
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                      {stats.recent.map((item, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center gap-2 text-sm"
+                          className="flex items-center gap-2 text-sm border-b border-gray-700/50 pb-2"
                         >
                           <span
                             className={
@@ -706,12 +700,20 @@ export default function AdminPage() {
                           >
                             {item.success ? "✓" : "✗"}
                           </span>
-                          <span className="text-gray-300 truncate">
+                          <span className="text-gray-300 truncate flex-1">
                             {item.user_name}
                           </span>
                           <span className="text-gray-500">→</span>
                           <span className="text-gray-400 truncate">
                             {item.request_type}
+                          </span>
+                          <span className="text-gray-500 text-xs ml-auto whitespace-nowrap">
+                            {new Date(item.created_at).toLocaleString("ru-RU", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
                         </div>
                       ))}
