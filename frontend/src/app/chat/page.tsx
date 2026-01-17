@@ -32,11 +32,9 @@ import ConsiliumResultComponent from "@/components/ConsiliumResult";
 import CourtPracticeProgress from "@/components/CourtPracticeProgress";
 import VerifiedCasesDisplay from "@/components/VerifiedCasesDisplay";
 import VerifiedNpaDisplay from "@/components/VerifiedNpaDisplay";
-import FileUpload from "@/components/FileUpload";
 import FilePreview from "@/components/FilePreview";
-import VoiceInput from "@/components/VoiceInput";
-import CameraCapture from "@/components/CameraCapture";
 import PhotoPreview from "@/components/PhotoPreview";
+import MediaInput from "@/components/MediaInput";
 
 type Mode = "single" | "consilium";
 
@@ -730,30 +728,16 @@ export default function ChatPage() {
 
           {/* Input row */}
           <div className="flex gap-2 sm:gap-3 items-end">
-            {/* File upload button */}
-            <FileUpload
+            {/* Media input (file, camera, voice) */}
+            <MediaInput
               token={token}
               onFileProcessed={handleFileProcessed}
-              disabled={isLoading}
+              onPhotoCapture={handlePhotoCapture}
+              onVoiceTranscript={handleVoiceTranscript}
+              disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
+              maxPhotos={MAX_PHOTOS}
+              currentPhotoCount={chatPhotoCount + capturedPhotos.length}
             />
-
-            {/* Camera button - mobile only */}
-            <div className="md:hidden">
-              <CameraCapture
-                onCapture={handlePhotoCapture}
-                disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
-                maxPhotos={MAX_PHOTOS}
-                currentPhotoCount={chatPhotoCount + capturedPhotos.length}
-              />
-            </div>
-
-            {/* Voice input button - mobile only */}
-            <div className="md:hidden">
-              <VoiceInput
-                onTranscript={handleVoiceTranscript}
-                disabled={isLoading}
-              />
-            </div>
 
             {/* Text input */}
             <div className="flex-1">
@@ -770,11 +754,6 @@ export default function ChatPage() {
                 }
               />
             </div>
-          </div>
-
-          {/* Mobile hint */}
-          <div className="md:hidden mt-2 text-xs text-gray-500 text-center">
-            Микрофон для голоса | Камера для документов (до {MAX_PHOTOS} фото)
           </div>
         </div>
       </div>
