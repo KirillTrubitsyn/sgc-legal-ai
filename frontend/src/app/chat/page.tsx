@@ -23,7 +23,6 @@ import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ModeSelector from "@/components/ModeSelector";
 import { History } from "lucide-react";
 import ModeToggle from "@/components/ModeToggle";
-import SearchToggle from "@/components/SearchToggle";
 import ChatMessage from "@/components/ChatMessage";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ChatInput from "@/components/ChatInput";
@@ -69,7 +68,6 @@ export default function ChatPage() {
   const [token, setToken] = useState("");
   const [mode, setMode] = useState<Mode>("single");
   const [queryMode, setQueryMode] = useState<QueryMode>("fast");
-  const [searchEnabled, setSearchEnabled] = useState(true);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -309,7 +307,7 @@ export default function ChatPage() {
           token,
           allMessages,
           queryMode,
-          searchEnabled,
+          true, // Поиск всегда включён
           (chunk) => {
             setStreamingContent((prev) => prev + chunk);
           },
@@ -549,11 +547,6 @@ export default function ChatPage() {
                 <ModeToggle
                   mode={queryMode}
                   onModeChange={setQueryMode}
-                  disabled={isLoading}
-                />
-                <SearchToggle
-                  enabled={searchEnabled}
-                  onToggle={setSearchEnabled}
                   disabled={isLoading}
                 />
               </>
