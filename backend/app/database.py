@@ -527,7 +527,13 @@ def get_usage_stats(days: int = 30, limit: int = 1000) -> Dict[str, Any]:
 
         # Get all stats for the period
         from datetime import datetime, timedelta
-        start_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+        if days == 1:
+            # "1 день" = только сегодня (с полуночи)
+            start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        else:
+            # Остальные периоды - N дней назад
+            start_date = (datetime.now() - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
         response = client.get(
             "/usage_stats",
