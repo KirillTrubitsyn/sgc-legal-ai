@@ -804,7 +804,8 @@ export async function exportAsDocx(
   token: string,
   question: string,
   answer: string,
-  model?: string
+  model?: string,
+  title?: string
 ): Promise<Blob> {
   const res = await fetch(`${API_URL}/api/query/export/docx`, {
     method: "POST",
@@ -812,7 +813,7 @@ export async function exportAsDocx(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ question, answer, model }),
+    body: JSON.stringify({ question, answer, model, title }),
   });
 
   if (!res.ok) {

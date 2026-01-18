@@ -138,8 +138,8 @@ export default function TranscriptionViewer({
   const handleExportResultDocx = async () => {
     if (!actionResult || !currentAction) return;
     try {
-      const title = `${ACTION_TITLES[currentAction]}: ${transcription.title}`;
-      const blob = await exportAsDocx(token, title, actionResult, "analysis");
+      const docTitle = `${ACTION_TITLES[currentAction]}: ${transcription.title}`;
+      const blob = await exportAsDocx(token, "", actionResult, "analysis", docTitle);
       const date = new Date().toISOString().split("T")[0];
       downloadBlob(blob, `${currentAction}-${date}.docx`);
     } catch (err) {

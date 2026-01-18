@@ -35,8 +35,13 @@ class TranscriptionResult:
     error: Optional[str] = None
 
 
-# Maximum audio chunk duration for reliable processing (15 minutes)
-CHUNK_DURATION_MS = 15 * 60 * 1000
+# Maximum audio chunk duration for reliable processing (5 minutes)
+# Smaller chunks = faster API response, better reliability for large files
+CHUNK_DURATION_MS = 5 * 60 * 1000
+
+# Retry settings for API calls
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 2
 
 # Gemini model for transcription
 TRANSCRIPTION_MODEL = "google/gemini-3-flash-preview"
@@ -80,7 +85,7 @@ async def transcribe_chunk_gemini(
     chunk_index: int = 0,
     total_chunks: int = 1
 ) -> str:
-    """Transcribe a single audio chunk using Gemini via OpenRouter"""
+    """Transcribe a single audio chunk using Gemini via OpenRouter with retry logic"""
 
     # Build multimodal message with audio
     messages = [
@@ -106,29 +111,55 @@ async def transcribe_chunk_gemini(
         }
     ]
 
-    async with httpx.AsyncClient(timeout=600.0) as client:
-        response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.openrouter_api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
-                "X-Title": "SGC Legal AI"
-            },
-            json={
-                "model": settings.model_file_processor,
-                "messages": messages,
-                "max_tokens": 16000,
-            }
-        )
+    last_error = None
 
-        if response.status_code != 200:
-            error_text = response.text
-            raise Exception(f"Gemini API error: {response.status_code} - {error_text}")
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.openrouter_api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://sgc-legal-ai.vercel.app",
+                        "X-Title": "SGC Legal AI"
+                    },
+                    json={
+                        "model": settings.model_file_processor,
+                        "messages": messages,
+                        "max_tokens": 16000,
+                    }
+                )
 
-        result = response.json()
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return content.strip()
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return content.strip()
+
+                # Handle rate limiting or server errors with retry
+                if response.status_code in [429, 500, 502, 503, 504]:
+                    last_error = f"API error {response.status_code}"
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(RETRY_DELAY_SECONDS * (2 ** attempt))
+                        continue
+
+                # Non-retryable error
+                error_text = response.text
+                raise Exception(f"Gemini API error: {response.status_code} - {error_text}")
+
+        except httpx.TimeoutException:
+            last_error = "Таймаут запроса"
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY_SECONDS * (2 ** attempt))
+                continue
+
+        except httpx.RequestError as e:
+            last_error = f"Ошибка сети: {str(e)}"
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY_SECONDS * (2 ** attempt))
+                continue
+
+    raise Exception(f"Не удалось транскрибировать после {MAX_RETRIES} попыток: {last_error}")
 
 
 def split_audio_into_chunks(
