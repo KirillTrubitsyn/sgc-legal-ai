@@ -209,10 +209,10 @@ export default function TranscriptionViewer({
     : transcription.text;
 
   return (
-    <div className="bg-sgc-blue-800 rounded-xl overflow-hidden">
+    <div className="bg-sgc-blue-800 rounded-xl overflow-hidden w-full">
       {/* Header */}
-      <div className="p-4 border-b border-sgc-blue-600">
-        <div className="flex items-start justify-between gap-3">
+      <div className="p-3 sm:p-4 border-b border-sgc-blue-600">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {isEditing ? (
               <div className="flex items-center gap-2">
@@ -224,7 +224,7 @@ export default function TranscriptionViewer({
                     if (e.key === "Enter") handleRename();
                     if (e.key === "Escape") setIsEditing(false);
                   }}
-                  className="flex-1 bg-sgc-blue-900 text-white px-3 py-1.5 rounded border border-sgc-blue-500 focus:outline-none focus:border-sgc-orange"
+                  className="flex-1 bg-sgc-blue-900 text-white px-3 py-1.5 rounded border border-sgc-blue-500 focus:outline-none focus:border-sgc-orange text-sm"
                   autoFocus
                 />
                 <button
@@ -242,7 +242,7 @@ export default function TranscriptionViewer({
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <h2 className="text-white text-lg font-semibold truncate">
+                <h2 className="text-white text-base sm:text-lg font-semibold truncate">
                   {transcription.title}
                 </h2>
                 <button
@@ -257,7 +257,7 @@ export default function TranscriptionViewer({
                 </button>
               </div>
             )}
-            <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-xs sm:text-sm text-gray-400">
               <span>{formatDate(transcription.created_at)}</span>
               <span className="text-gray-600">|</span>
               <span>{transcription.word_count.toLocaleString()} слов</span>
@@ -311,7 +311,7 @@ export default function TranscriptionViewer({
       </div>
 
       {/* Content */}
-      <div className="p-4 space-y-4">
+      <div className="p-3 sm:p-4 space-y-4">
         {/* Action Result */}
         {(isProcessing || actionResult || actionError) && (
           <div className="bg-sgc-orange/10 border border-sgc-orange/30 rounded-lg p-4">
