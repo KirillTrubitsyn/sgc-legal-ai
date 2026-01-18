@@ -1083,3 +1083,176 @@ export async function transcribeAudio(
 
   return result;
 }
+
+// Transcriptions API functions (for /audio page)
+
+export interface TranscriptionMeta {
+  id: string;
+  title: string;
+  word_count: number;
+  duration_seconds: number;
+  filename?: string;
+  created_at: string;
+}
+
+export interface TranscriptionFull extends TranscriptionMeta {
+  text: string;
+  invite_code_id: string;
+}
+
+export interface TranscriptionListResponse {
+  transcriptions: TranscriptionMeta[];
+  count: number;
+  max_allowed: number;
+}
+
+export interface TranscriptionSaveEvent {
+  stage: "saved";
+  transcription_id: string;
+  title: string;
+}
+
+export async function getTranscriptions(token: string): Promise<TranscriptionListResponse> {
+  const res = await fetch(`${API_URL}/api/transcriptions/list`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось получить список транскрипций");
+  }
+
+  return res.json();
+}
+
+export async function getTranscription(token: string, id: string): Promise<TranscriptionFull> {
+  const res = await fetch(`${API_URL}/api/transcriptions/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось получить транскрипцию");
+  }
+
+  return res.json();
+}
+
+export async function updateTranscriptionTitle(
+  token: string,
+  id: string,
+  title: string
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/transcriptions/${id}/title`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось обновить название");
+  }
+}
+
+export async function deleteTranscription(token: string, id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/transcriptions/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось удалить транскрипцию");
+  }
+}
+
+export interface TranscribeAndSaveProgress extends TranscriptionProgress {
+  transcription_id?: string;
+}
+
+export async function transcribeAndSaveAudio(
+  token: string,
+  file: File,
+  onProgress: (progress: TranscribeAndSaveProgress) => void
+): Promise<{ transcription_id: string; text: string; word_count: number }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/transcriptions/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Ошибка транскрибации");
+  }
+
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) throw new Error("No response body");
+
+  let result = {
+    transcription_id: "",
+    text: "",
+    word_count: 0,
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const text = decoder.decode(value);
+      const lines = text.split("\n");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            return result;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+
+            // Handle save event
+            if (parsed.stage === "saved") {
+              result.transcription_id = parsed.transcription_id;
+              onProgress(parsed);
+              continue;
+            }
+
+            // Handle progress events
+            onProgress(parsed as TranscribeAndSaveProgress);
+
+            if (parsed.stage === "complete" && parsed.text) {
+              result.text = parsed.text;
+              result.word_count = parsed.word_count || 0;
+            }
+
+            if (parsed.stage === "error") {
+              throw new Error(parsed.message);
+            }
+          } catch (parseError) {
+            if (parseError instanceof Error && !parseError.message.includes("JSON")) {
+              throw parseError;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    if (errorMessage.includes("Load failed") || errorMessage.includes("network")) {
+      throw new Error("Соединение прервано. Не сворачивайте приложение во время транскрибации.");
+    }
+    throw err;
+  }
+
+  return result;
+}

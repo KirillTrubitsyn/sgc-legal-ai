@@ -792,3 +792,122 @@ def get_usage_stats(days: int = 30, limit: int = 1000) -> Dict[str, Any]:
             "period_days": days,
             "error": str(e)
         }
+
+
+# Transcriptions functions
+
+MAX_TRANSCRIPTIONS = 50  # Maximum transcriptions per invite code
+
+
+def create_transcription(
+    invite_code_id: str,
+    title: str,
+    text: str,
+    word_count: int,
+    duration_seconds: float = 0,
+    filename: str = None
+) -> Optional[Dict]:
+    """Create a new transcription"""
+    try:
+        client = get_client()
+        data = {
+            "invite_code_id": invite_code_id,
+            "title": title,
+            "text": text,
+            "word_count": word_count,
+            "duration_seconds": duration_seconds
+        }
+        if filename:
+            data["filename"] = filename
+
+        response = client.post("/transcriptions", json=data)
+        response.raise_for_status()
+        result = response.json()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"create_transcription error: {e}")
+        return None
+
+
+def get_transcriptions(invite_code_id: str) -> list:
+    """Get all transcriptions for an invite code, ordered by created_at desc"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/transcriptions",
+            params={
+                "invite_code_id": f"eq.{invite_code_id}",
+                "select": "id,title,word_count,duration_seconds,filename,created_at",
+                "order": "created_at.desc"
+            }
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"get_transcriptions error: {e}")
+        return []
+
+
+def get_transcription(transcription_id: str) -> Optional[Dict]:
+    """Get a single transcription by ID with full text"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/transcriptions",
+            params={"id": f"eq.{transcription_id}", "select": "*"}
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data[0] if data else None
+    except Exception as e:
+        print(f"get_transcription error: {e}")
+        return None
+
+
+def update_transcription_title(transcription_id: str, title: str) -> bool:
+    """Update transcription title"""
+    try:
+        client = get_client()
+        response = client.patch(
+            "/transcriptions",
+            params={"id": f"eq.{transcription_id}"},
+            json={"title": title}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"update_transcription_title error: {e}")
+        return False
+
+
+def delete_transcription(transcription_id: str) -> bool:
+    """Delete a transcription"""
+    try:
+        client = get_client()
+        response = client.delete(
+            "/transcriptions",
+            params={"id": f"eq.{transcription_id}"}
+        )
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"delete_transcription error: {e}")
+        return False
+
+
+def get_transcriptions_count(invite_code_id: str) -> int:
+    """Get count of transcriptions for an invite code"""
+    try:
+        client = get_client()
+        response = client.get(
+            "/transcriptions",
+            params={
+                "invite_code_id": f"eq.{invite_code_id}",
+                "select": "id"
+            }
+        )
+        response.raise_for_status()
+        return len(response.json())
+    except Exception as e:
+        print(f"get_transcriptions_count error: {e}")
+        return 0
