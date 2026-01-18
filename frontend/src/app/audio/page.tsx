@@ -76,6 +76,27 @@ export default function AudioPage() {
     };
   }, [mediaRecorder]);
 
+  // Recording timer effect
+  useEffect(() => {
+    if (isRecording) {
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    };
+  }, [isRecording]);
+
   const loadTranscriptions = async (authToken: string) => {
     try {
       const data = await getTranscriptions(authToken);
@@ -250,13 +271,8 @@ export default function AudioPage() {
 
       recorder.start(1000); // Collect data every second
       setMediaRecorder(recorder);
-      setIsRecording(true);
       setRecordingTime(0);
-
-      // Start timer
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
+      setIsRecording(true); // This triggers the timer useEffect
 
     } catch (err) {
       console.error("Failed to start recording:", err);
