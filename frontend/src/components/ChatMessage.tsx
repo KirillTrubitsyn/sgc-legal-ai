@@ -52,7 +52,7 @@ export default function ChatMessage({ role, content, onSave, question, model, to
   const showActions = !isUser && (onSave || token);
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 group`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 group`} data-role={role}>
       <div
         className={`px-4 py-3 rounded-2xl ${
           isUser
