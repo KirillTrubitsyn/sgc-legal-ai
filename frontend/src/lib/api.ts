@@ -977,3 +977,109 @@ export async function webSearch(
     }
   }
 }
+
+// Audio Transcription API functions
+
+export interface TranscriptionProgress {
+  stage: "preparing" | "transcribing" | "complete" | "error";
+  progress: number; // 0.0 to 1.0
+  message: string;
+  chunk_index?: number;
+  total_chunks?: number;
+  text?: string;
+  word_count?: number;
+}
+
+export interface TranscriptionResult {
+  success: boolean;
+  text: string;
+  duration_seconds: number;
+  chunks_processed: number;
+  word_count: number;
+  error?: string;
+}
+
+export async function transcribeAudio(
+  token: string,
+  file: File,
+  onProgress: (progress: TranscriptionProgress) => void
+): Promise<TranscriptionResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/files/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Ошибка транскрибации");
+  }
+
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) throw new Error("No response body");
+
+  let result: TranscriptionResult = {
+    success: false,
+    text: "",
+    duration_seconds: 0,
+    chunks_processed: 0,
+    word_count: 0,
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const text = decoder.decode(value);
+      const lines = text.split("\n");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            return result;
+          }
+
+          try {
+            const parsed = JSON.parse(data) as TranscriptionProgress;
+            onProgress(parsed);
+
+            if (parsed.stage === "complete" && parsed.text) {
+              result = {
+                success: true,
+                text: parsed.text,
+                duration_seconds: 0,
+                chunks_processed: parsed.total_chunks || 1,
+                word_count: parsed.word_count || 0,
+              };
+            }
+
+            if (parsed.stage === "error") {
+              throw new Error(parsed.message);
+            }
+          } catch (parseError) {
+            if (parseError instanceof Error && !parseError.message.includes("JSON")) {
+              throw parseError;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    if (errorMessage.includes("Load failed") || errorMessage.includes("network")) {
+      throw new Error("Соединение прервано. Не сворачивайте приложение во время транскрибации.");
+    }
+    throw err;
+  }
+
+  return result;
+}

@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # OpenRouter
     openrouter_api_key: str
 
+    # OpenAI API (for Whisper transcription)
+    openai_api_key: str = ""
+
     # Google Custom Search API
     google_api_key: str = ""
     google_cx: str = ""  # Search Engine ID
@@ -33,7 +36,11 @@ class Settings(BaseSettings):
 
     # File upload
     max_file_size: int = 25 * 1024 * 1024  # 25 MB
-    max_audio_duration: int = 300  # 5 minutes in seconds
+    max_audio_duration: int = 300  # 5 minutes in seconds (for quick transcription)
+
+    # Long audio transcription (for court recordings)
+    max_long_audio_size: int = 500 * 1024 * 1024  # 500 MB
+    max_long_audio_duration: int = 7200  # 2 hours in seconds
 
     # Admin
     admin_password: str = "ADMIN2026"

@@ -34,6 +34,9 @@ import VerifiedNpaDisplay from "@/components/VerifiedNpaDisplay";
 import FilePreview from "@/components/FilePreview";
 import PhotoPreview from "@/components/PhotoPreview";
 import { FileButton, CameraButton, VoiceButton } from "@/components/MobileInputButtons";
+import AudioTranscriptionButton from "@/components/AudioTranscriptionButton";
+import TranscriptionResultComponent from "@/components/TranscriptionResult";
+import { TranscriptionResult } from "@/lib/api";
 
 type Mode = "single" | "consilium";
 
@@ -82,6 +85,8 @@ export default function ChatPage() {
   const [pendingText, setPendingText] = useState("");
   const [voiceInputText, setVoiceInputText] = useState("");
   const [continuedFromSaved, setContinuedFromSaved] = useState(false);
+  // Audio transcription result
+  const [transcriptionResult, setTranscriptionResult] = useState<TranscriptionResult | null>(null);
   // Chat session state
   const [currentChatSession, setCurrentChatSession] = useState<ChatSession | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -185,6 +190,23 @@ export default function ChatPage() {
   // Handle voice input transcript
   const handleVoiceTranscript = (text: string) => {
     setVoiceInputText(prev => prev ? prev + " " + text : text);
+  };
+
+  // Handle audio transcription result
+  const handleTranscriptionComplete = (result: TranscriptionResult) => {
+    setTranscriptionResult(result);
+  };
+
+  // Handle using transcription in chat
+  const handleUseTranscriptionInChat = (text: string) => {
+    // Set the text as file context and show a prompt
+    setUploadedFile({
+      success: true,
+      file_type: "transcription",
+      extracted_text: text,
+      summary: `Транскрипция аудио | ${text.split(" ").length} слов`,
+    });
+    setTranscriptionResult(null);
   };
 
   // Handle camera capture
@@ -727,15 +749,22 @@ export default function ChatPage() {
             placeholder={
               capturedPhotos.length > 0
                 ? "Вопрос по фото..."
-                : uploadedFile
-                  ? "Вопрос по файлу..."
-                  : "Спросите что угодно..."
+                : uploadedFile?.file_type === "transcription"
+                  ? "Вопрос по транскрипции..."
+                  : uploadedFile
+                    ? "Вопрос по файлу..."
+                    : "Спросите что угодно..."
             }
             bottomLeftContent={
               <>
                 <FileButton
                   token={token}
                   onFileProcessed={handleFileProcessed}
+                  disabled={isLoading}
+                />
+                <AudioTranscriptionButton
+                  token={token}
+                  onTranscriptionComplete={handleTranscriptionComplete}
                   disabled={isLoading}
                 />
                 <CameraButton
@@ -764,6 +793,15 @@ export default function ChatPage() {
           onNewChat={handleNewChat}
           isOpen={isSidebarOpen}
           onToggle={setIsSidebarOpen}
+        />
+      )}
+
+      {/* Transcription Result Modal */}
+      {transcriptionResult && (
+        <TranscriptionResultComponent
+          result={transcriptionResult}
+          onUseInChat={handleUseTranscriptionInChat}
+          onClose={() => setTranscriptionResult(null)}
         />
       )}
     </div>
