@@ -167,8 +167,9 @@ export function CameraButton({ onCapture, disabled, maxPhotos = 5, currentPhotoC
       </button>
 
       {showCamera && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
-          <div className="flex items-center justify-between p-4">
+        <div className="fixed inset-0 z-50 bg-black">
+          {/* Header */}
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4 pt-12 bg-gradient-to-b from-black/70 to-transparent">
             <button onClick={closeCamera} className="text-white p-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -178,28 +179,28 @@ export function CameraButton({ onCapture, disabled, maxPhotos = 5, currentPhotoC
             </button>
           </div>
 
-          <div className="flex-1 relative">
-            {error ? (
-              <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
-                <div>
-                  <p className="mb-4">{error}</p>
-                  <button onClick={startCamera} className="px-4 py-2 bg-sgc-orange-500 rounded-lg">Повторить</button>
-                </div>
+          {/* Video */}
+          {error ? (
+            <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
+              <div>
+                <p className="mb-4">{error}</p>
+                <button onClick={startCamera} className="px-4 py-2 bg-sgc-orange-500 rounded-lg">Повторить</button>
               </div>
-            ) : (
-              <>
-                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                {!ready && <div className="absolute inset-0 flex items-center justify-center bg-black"><div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"/></div>}
-              </>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+              {!ready && <div className="absolute inset-0 flex items-center justify-center bg-black"><div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"/></div>}
+            </>
+          )}
 
-          {/* Capture button - with safe area for iPhone */}
-          <div className="p-4 pb-8 flex justify-center bg-black/50">
-            <button onClick={capture} disabled={!ready} className={`w-18 h-18 rounded-full border-4 border-white flex items-center justify-center ${!ready ? "opacity-50" : "active:scale-95"} transition-transform`} style={{ width: 72, height: 72 }}>
-              <div className="w-14 h-14 rounded-full bg-white"/>
+          {/* Capture button - absolute positioned at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 flex justify-center pb-8 pt-4 bg-gradient-to-t from-black/70 to-transparent" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
+            <button onClick={capture} disabled={!ready} className={`rounded-full border-4 border-white flex items-center justify-center shadow-lg ${!ready ? "opacity-50" : "active:scale-95"} transition-transform`} style={{ width: 72, height: 72 }}>
+              <div className="rounded-full bg-white" style={{ width: 56, height: 56 }}/>
             </button>
           </div>
+
           <canvas ref={canvasRef} className="hidden"/>
         </div>
       )}
