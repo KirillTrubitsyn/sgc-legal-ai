@@ -168,10 +168,9 @@ export default function AudioPage() {
     }
   };
 
-  const handleGoToChat = (text: string, prompt?: string) => {
-    // Store the text and optional prompt in sessionStorage for chat page to pick up
-    const fullPrompt = prompt ? `${prompt}\n\n${text}` : text;
-    sessionStorage.setItem("transcription_context", fullPrompt);
+  const handleGoToChat = (text: string) => {
+    // Store the text in sessionStorage for chat page to pick up
+    sessionStorage.setItem("transcription_context", text);
     router.push("/chat");
   };
 
@@ -207,6 +206,9 @@ export default function AudioPage() {
   };
 
   const formatProgress = (value: number): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return "0%";
+    }
     return `${Math.round(value * 100)}%`;
   };
 
@@ -423,6 +425,7 @@ export default function AudioPage() {
             {selectedTranscription && !isLoadingTranscription && (
               <TranscriptionViewer
                 transcription={selectedTranscription}
+                token={token}
                 onClose={() => setSelectedTranscription(null)}
                 onGoToChat={handleGoToChat}
                 onDownloadDocx={() => handleDownloadDocx(selectedTranscription)}

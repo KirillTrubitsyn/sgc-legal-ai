@@ -1,21 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { TranscriptionFull } from "@/lib/api";
-import { Pencil, Trash2, X, Check, Copy, CheckCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { TranscriptionFull, sendQuery, Message, exportAsDocx, downloadBlob } from "@/lib/api";
+import { Pencil, Trash2, X, Check, Copy, CheckCheck, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface TranscriptionViewerProps {
   transcription: TranscriptionFull;
+  token: string;
   onClose: () => void;
-  onGoToChat: (text: string, prompt?: string) => void;
+  onGoToChat: (text: string) => void;
   onDownloadDocx: () => void;
   onDownloadTxt: () => void;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }
 
+type ActionType = "summary" | "analyze" | "tasks" | null;
+
+const ACTION_PROMPTS: Record<Exclude<ActionType, null>, string> = {
+  summary: `Сделай структурированное резюме этой транскрипции. Выдели:
+1. Основные темы и вопросы
+2. Ключевые решения и договорённости
+3. Участники и их позиции
+4. Важные даты и сроки (если упоминаются)
+5. Следующие шаги и action items`,
+  analyze: `Проанализируй эту транскрипцию и выдели:
+- Ключевые моменты и аргументы
+- Позиции участников
+- Спорные или важные вопросы
+- Рекомендации по дальнейшим действиям`,
+  tasks: `Извлеки из этой транскрипции все задачи, поручения и action items. Для каждой задачи укажи:
+- Описание задачи
+- Ответственный (если указан)
+- Срок (если указан)
+- Приоритет (высокий/средний/низкий)`,
+};
+
+const ACTION_TITLES: Record<Exclude<ActionType, null>, string> = {
+  summary: "Саммари",
+  analyze: "Анализ",
+  tasks: "Задачи",
+};
+
 export default function TranscriptionViewer({
   transcription,
+  token,
   onClose,
   onGoToChat,
   onDownloadDocx,
@@ -27,9 +57,17 @@ export default function TranscriptionViewer({
   const [editTitle, setEditTitle] = useState(transcription.title);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedResult, setCopiedResult] = useState(false);
   const [showFullText, setShowFullText] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Quick action state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentAction, setCurrentAction] = useState<ActionType>(null);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [actionResult, setActionResult] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleCopy = async () => {
     try {
@@ -45,6 +83,24 @@ export default function TranscriptionViewer({
       document.body.removeChild(textArea);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopyResult = async () => {
+    if (!actionResult) return;
+    try {
+      await navigator.clipboard.writeText(actionResult);
+      setCopiedResult(true);
+      setTimeout(() => setCopiedResult(false), 2000);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = actionResult;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedResult(true);
+      setTimeout(() => setCopiedResult(false), 2000);
     }
   };
 
@@ -79,39 +135,61 @@ export default function TranscriptionViewer({
     }
   };
 
-  const handleSummarize = () => {
-    onGoToChat(transcription.text, `Сделай структурированное резюме этой транскрипции. Выдели:
-1. Основные темы и вопросы
-2. Ключевые решения и договорённости
-3. Участники и их позиции
-4. Важные даты и сроки (если упоминаются)
-5. Следующие шаги и action items
-
-Транскрипция:`);
+  const handleExportResultDocx = async () => {
+    if (!actionResult || !currentAction) return;
+    try {
+      const title = `${ACTION_TITLES[currentAction]}: ${transcription.title}`;
+      const blob = await exportAsDocx(token, title, actionResult, "analysis");
+      const date = new Date().toISOString().split("T")[0];
+      downloadBlob(blob, `${currentAction}-${date}.docx`);
+    } catch (err) {
+      console.error("Export error:", err);
+    }
   };
 
-  const handleAnalyze = () => {
-    onGoToChat(transcription.text, `Проанализируй эту транскрипцию и выдели:
-- Ключевые моменты и аргументы
-- Позиции участников
-- Спорные или важные вопросы
-- Рекомендации по дальнейшим действиям
+  const runQuickAction = async (action: Exclude<ActionType, null>) => {
+    setIsProcessing(true);
+    setCurrentAction(action);
+    setStreamingContent("");
+    setActionResult(null);
+    setActionError(null);
 
-Транскрипция:`);
-  };
+    const prompt = ACTION_PROMPTS[action];
+    const fullPrompt = `${prompt}\n\nТранскрипция:\n\n${transcription.text}`;
 
-  const handleExtractTasks = () => {
-    onGoToChat(transcription.text, `Извлеки из этой транскрипции все задачи, поручения и action items. Для каждой задачи укажи:
-- Описание задачи
-- Ответственный (если указан)
-- Срок (если указан)
-- Приоритет (высокий/средний/низкий)
+    const messages: Message[] = [{ role: "user", content: fullPrompt }];
 
-Транскрипция:`);
+    try {
+      const result = await sendQuery(
+        token,
+        messages,
+        "fast",
+        false, // No search needed for analysis
+        (chunk) => {
+          setStreamingContent((prev) => prev + chunk);
+        },
+        undefined, // No stage updates
+        undefined, // No file context
+        undefined  // No chat session
+      );
+
+      setActionResult(result.content);
+      setStreamingContent("");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Ошибка обработки");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDiscuss = () => {
     onGoToChat(transcription.text);
+  };
+
+  const clearResult = () => {
+    setActionResult(null);
+    setCurrentAction(null);
+    setActionError(null);
   };
 
   // Format date
@@ -234,6 +312,64 @@ export default function TranscriptionViewer({
 
       {/* Content */}
       <div className="p-4 space-y-4">
+        {/* Action Result */}
+        {(isProcessing || actionResult || actionError) && (
+          <div className="bg-sgc-orange/10 border border-sgc-orange/30 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sgc-orange text-sm font-medium flex items-center gap-2">
+                {isProcessing && <Loader2 size={14} className="animate-spin" />}
+                {currentAction && ACTION_TITLES[currentAction]}
+              </span>
+              <div className="flex items-center gap-2">
+                {actionResult && (
+                  <>
+                    <button
+                      onClick={handleCopyResult}
+                      className="text-gray-400 hover:text-white text-xs flex items-center gap-1"
+                    >
+                      {copiedResult ? (
+                        <>
+                          <CheckCheck size={12} className="text-green-400" />
+                          <span className="text-green-400">Скопировано</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={12} />
+                          <span>Копировать</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleExportResultDocx}
+                      className="text-gray-400 hover:text-white text-xs"
+                    >
+                      DOCX
+                    </button>
+                  </>
+                )}
+                {!isProcessing && (
+                  <button
+                    onClick={clearResult}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {actionError ? (
+              <p className="text-red-400 text-sm">{actionError}</p>
+            ) : (
+              <div className="text-gray-200 text-sm prose prose-invert prose-sm max-w-none max-h-[40vh] overflow-y-auto">
+                <ReactMarkdown>
+                  {actionResult || streamingContent || "Обработка..."}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Text */}
         <div className="bg-sgc-blue-900 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
@@ -290,16 +426,21 @@ export default function TranscriptionViewer({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {/* Summarize */}
             <button
-              onClick={handleSummarize}
-              className="flex items-center gap-3 p-3 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg transition-colors"
+              onClick={() => runQuickAction("summary")}
+              disabled={isProcessing}
+              className="flex items-center gap-3 p-3 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg transition-colors disabled:opacity-50"
             >
               <div className="w-10 h-10 bg-sgc-orange/20 rounded-lg flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-sgc-orange">
-                  <line x1="21" y1="10" x2="3" y2="10" />
-                  <line x1="21" y1="6" x2="3" y2="6" />
-                  <line x1="21" y1="14" x2="3" y2="14" />
-                  <line x1="21" y1="18" x2="3" y2="18" />
-                </svg>
+                {isProcessing && currentAction === "summary" ? (
+                  <Loader2 size={20} className="text-sgc-orange animate-spin" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-sgc-orange">
+                    <line x1="21" y1="10" x2="3" y2="10" />
+                    <line x1="21" y1="6" x2="3" y2="6" />
+                    <line x1="21" y1="14" x2="3" y2="14" />
+                    <line x1="21" y1="18" x2="3" y2="18" />
+                  </svg>
+                )}
               </div>
               <div className="text-left">
                 <p className="text-white text-sm font-medium">Сделать саммари</p>
@@ -309,16 +450,21 @@ export default function TranscriptionViewer({
 
             {/* Analyze */}
             <button
-              onClick={handleAnalyze}
-              className="flex items-center gap-3 p-3 bg-sgc-blue-700 hover:bg-sgc-blue-600 rounded-lg transition-colors"
+              onClick={() => runQuickAction("analyze")}
+              disabled={isProcessing}
+              className="flex items-center gap-3 p-3 bg-sgc-blue-700 hover:bg-sgc-blue-600 rounded-lg transition-colors disabled:opacity-50"
             >
               <div className="w-10 h-10 bg-sgc-blue-600 rounded-lg flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                </svg>
+                {isProcessing && currentAction === "analyze" ? (
+                  <Loader2 size={20} className="text-white animate-spin" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                )}
               </div>
               <div className="text-left">
                 <p className="text-white text-sm font-medium">Анализ</p>
@@ -328,14 +474,19 @@ export default function TranscriptionViewer({
 
             {/* Extract Tasks */}
             <button
-              onClick={handleExtractTasks}
-              className="flex items-center gap-3 p-3 bg-sgc-blue-700 hover:bg-sgc-blue-600 rounded-lg transition-colors"
+              onClick={() => runQuickAction("tasks")}
+              disabled={isProcessing}
+              className="flex items-center gap-3 p-3 bg-sgc-blue-700 hover:bg-sgc-blue-600 rounded-lg transition-colors disabled:opacity-50"
             >
               <div className="w-10 h-10 bg-sgc-blue-600 rounded-lg flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
-                  <path d="M9 11l3 3L22 4" />
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                </svg>
+                {isProcessing && currentAction === "tasks" ? (
+                  <Loader2 size={20} className="text-white animate-spin" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                  </svg>
+                )}
               </div>
               <div className="text-left">
                 <p className="text-white text-sm font-medium">Извлечь задачи</p>
@@ -343,10 +494,11 @@ export default function TranscriptionViewer({
               </div>
             </button>
 
-            {/* Discuss */}
+            {/* Discuss in Chat */}
             <button
               onClick={handleDiscuss}
-              className="flex items-center gap-3 p-3 bg-sgc-blue-700 hover:bg-sgc-blue-600 rounded-lg transition-colors"
+              disabled={isProcessing}
+              className="flex items-center gap-3 p-3 bg-sgc-blue-700 hover:bg-sgc-blue-600 rounded-lg transition-colors disabled:opacity-50"
             >
               <div className="w-10 h-10 bg-sgc-blue-600 rounded-lg flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
