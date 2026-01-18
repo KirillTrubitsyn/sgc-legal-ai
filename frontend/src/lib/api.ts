@@ -53,6 +53,8 @@ export interface Message {
 export interface SingleQueryStageUpdate {
   stage: string;
   message?: string;
+  task_type?: string;  // Type of task (legal_opinion, summarize, draft, etc.)
+  task_label?: string; // Russian label for task type
 }
 
 // Result of single query including verified cases and NPA
