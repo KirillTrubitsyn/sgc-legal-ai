@@ -31,142 +31,10 @@ from app.services.npa_verification import (
     verify_npa_references,
     NPA_SEARCH_PROMPT_ADDITION
 )
+from app.services.task_classifier import classify_task, get_task_label, TaskType
+from app.services.prompts import get_system_prompt, get_prompt_with_cases
 
 router = APIRouter(prefix="/api/query", tags=["query"])
-
-
-# Системный промпт БЕЗ верифицированных дел
-LEGAL_SYSTEM_PROMPT = """Ты — опытный российский юрист с глубокими знаниями в области гражданского, корпоративного, экологического, процессуального, административного и трудового законодательства.
-
-СТРУКТУРА ОТВЕТА:
-
-1. **Нумерованные разделы** — используй арабские цифры (1. 2. 3.)
-2. **Заключение/Выводы** — итоговый раздел с практическими рекомендациями
-
-ТИПОВАЯ СТРУКТУРА РАЗДЕЛОВ:
-
-Для правовых вопросов:
-1. Существо вопроса
-2. Правовое регулирование
-3. Правовая оценка / Анализ
-4. Риски (если применимо)
-5. Выводы
-
-Для судебных споров:
-1. Обстоятельства спора
-2. Позиции сторон
-3. Анализ судебной практики
-4. Правовая оценка
-5. Выводы и рекомендации
-
-СТИЛЬ ИЗЛОЖЕНИЯ:
-
-- Профессиональный юридический язык без эмоциональной окраски
-- Убедительная аргументация через факты и логику
-- Структура каждого параграфа: тезис → аргументация → вывод
-- Сложные вопросы объясняй доступно, избегая излишних канцеляризмов
-- Номера статей и пунктов пиши ТОЛЬКО цифрами (ст. 333 ГК РФ, п. 75)
-- НЕ ПИШИ заголовки типа "Аналитическая справка", "Правовое заключение" и т.п.
-- Сразу начинай с содержания ответа
-
-ФОРМАТИРОВАНИЕ:
-
-- **Ключевые выводы** каждого раздела выделяй жирным (последнее предложение параграфа)
-- **Критически важные факты и цифры** выделяй жирным
-- **Правовые позиции и нормы** при первом упоминании выделяй жирным
-- **Предупреждения о рисках** выделяй жирным
-- Прямые цитаты из судебных решений или НПА выделяй курсивом (*цитата*)
-- НЕ выделяй: обычные факты, названия организаций, даты и номера дел
-- Числовые данные: значительные суммы пиши прописью с цифрами в скобках — «один миллион (1 000 000) рублей»
-- Избегай таблиц и сложной markdown-разметки
-- Используй буллеты только для перечисления однородных элементов
-
-ПРИНЦИПЫ:
-
-- Каждый раздел должен содержать чёткий тезис
-- Отсутствие эмоциональных оценок
-- Документ всегда завершается выводами
-- Если не уверен в актуальности информации — честно укажи это
-
-Отвечай на русском языке, структурированно и профессионально."""
-
-
-# Системный промпт С верифицированными делами (шаблон)
-LEGAL_SYSTEM_PROMPT_WITH_CASES = """Ты — опытный российский юрист с глубокими знаниями в области гражданского, корпоративного, экологического, процессуального, административного и трудового законодательства.
-
-СТРУКТУРА ОТВЕТА:
-
-1. **Нумерованные разделы** — используй арабские цифры (1. 2. 3.)
-2. **Заключение/Выводы** — итоговый раздел с практическими рекомендациями
-
-ТИПОВАЯ СТРУКТУРА РАЗДЕЛОВ:
-
-Для правовых вопросов:
-1. Существо вопроса
-2. Правовое регулирование
-3. Судебная практика
-4. Правовая оценка / Анализ
-5. Выводы
-
-Для судебных споров:
-1. Обстоятельства спора
-2. Позиции сторон
-3. Анализ судебной практики
-4. Правовая оценка
-5. Выводы и рекомендации
-
-СТИЛЬ ИЗЛОЖЕНИЯ:
-
-- Профессиональный юридический язык без эмоциональной окраски
-- Убедительная аргументация через факты и логику
-- Структура каждого параграфа: тезис → аргументация → вывод
-- Сложные вопросы объясняй доступно, избегая излишних канцеляризмов
-- Номера статей и пунктов пиши ТОЛЬКО цифрами (ст. 333 ГК РФ, п. 75)
-- НЕ ПИШИ заголовки типа "Аналитическая справка", "Правовое заключение" и т.п.
-- Сразу начинай с содержания ответа
-
-ФОРМАТИРОВАНИЕ:
-
-- **Ключевые выводы** каждого раздела выделяй жирным (последнее предложение параграфа)
-- **Критически важные факты и цифры** выделяй жирным
-- **Правовые позиции и нормы** при первом упоминании выделяй жирным
-- **Предупреждения о рисках** выделяй жирным
-- Прямые цитаты из судебных решений или НПА выделяй курсивом (*цитата*)
-- НЕ выделяй: обычные факты, названия организаций, даты и номера дел
-- Числовые данные: значительные суммы пиши прописью с цифрами в скобках — «один миллион (1 000 000) рублей»
-- Избегай таблиц и сложной markdown-разметки
-- Используй буллеты только для перечисления однородных элементов
-
-ВЕРИФИЦИРОВАННАЯ СУДЕБНАЯ ПРАКТИКА:
-{verified_cases}
-
-ВЕРИФИЦИРОВАННЫЕ НОРМАТИВНО-ПРАВОВЫЕ АКТЫ:
-{verified_npa}
-
-ПРАВИЛА РАБОТЫ С СУДЕБНОЙ ПРАКТИКОЙ:
-
-- Используй в ответе ТОЛЬКО дела со статусом VERIFIED — они проверены через официальные базы
-- Ссылайся на номера дел точно так, как они указаны выше
-- Не выдумывай номера дел — используй только предоставленные
-- Цитируй позиции судов, опираясь на информацию из верифицированных дел
-- Дела со статусом LIKELY_EXISTS можно упоминать с оговоркой о необходимости проверки
-- При ссылке на дело указывай: номер, суд, суть правовой позиции
-
-ПРАВИЛА РАБОТЫ С НПА:
-
-- НПА со статусом VERIFIED — действуют в текущей редакции, можно ссылаться без оговорок
-- НПА со статусом AMENDED — были изменены, укажи актуальную редакцию
-- НПА со статусом REPEALED — утратили силу, укажи это явно при ссылке
-- Если нет информации о верификации — используй стандартные ссылки (ст. 333 ГК РФ)
-
-ПРИНЦИПЫ:
-
-- Каждый раздел должен содержать чёткий тезис
-- Отсутствие эмоциональных оценок
-- Документ всегда завершается выводами
-- Если не уверен в актуальности информации — честно укажи это
-
-Отвечай на русском языке, структурированно и профессионально."""
 
 
 class QueryMode(str, Enum):
@@ -250,13 +118,34 @@ async def single_query(
         full_response = ""
         search_results = ""
         verified_npa_list = []
+        task_type = TaskType.LEGAL_OPINION  # Default
         start_time = time.time()
         success = True
         error_msg = None
 
         try:
-            # Stage 1: Search (if enabled)
-            if request.search_enabled and user_query:
+            # Stage 0: Classify task type
+            if user_query:
+                yield f"data: {json.dumps({'stage': 'classifying', 'message': 'Определение типа задачи...'}, ensure_ascii=False)}\n\n"
+                try:
+                    task_type = classify_task(
+                        user_message=user_query,
+                        has_file_context=bool(request.file_context),
+                        file_name=None  # TODO: pass file name if available
+                    )
+                    task_label = get_task_label(task_type)
+                    yield f"data: {json.dumps({'stage': 'classified', 'message': f'Режим: {task_label}', 'task_type': task_type.value, 'task_label': task_label}, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    # Fallback to legal_opinion on error
+                    task_type = TaskType.LEGAL_OPINION
+                    yield f"data: {json.dumps({'stage': 'classify_error', 'message': 'Используется режим по умолчанию'}, ensure_ascii=False)}\n\n"
+
+            # Stage 1: Search (if enabled and task type benefits from it)
+            # Search is most useful for legal_opinion and general questions
+            should_search = request.search_enabled and user_query and task_type in [
+                TaskType.LEGAL_OPINION, TaskType.GENERAL, TaskType.DRAFT
+            ]
+            if should_search:
                 yield f"data: {json.dumps({'stage': 'search', 'message': 'Поиск актуальной информации...'}, ensure_ascii=False)}\n\n"
 
                 try:
@@ -266,16 +155,17 @@ async def single_query(
                     yield f"data: {json.dumps({'stage': 'search_error', 'message': f'Ошибка поиска: {str(e)}'}, ensure_ascii=False)}\n\n"
                     search_results = ""
 
-            # Stage 1.5: Extract and verify NPA from user query
-            npa_references = extract_npa_references_regex(user_query)
-            if npa_references:
-                yield f"data: {json.dumps({'stage': 'npa_verify', 'message': f'Верификация {len(npa_references)} НПА...'}, ensure_ascii=False)}\n\n"
-                try:
-                    verified_npa_list = await verify_npa_references(npa_references, max_concurrent=2)
-                    yield f"data: {json.dumps({'stage': 'npa_verify_complete', 'message': 'Верификация НПА завершена'}, ensure_ascii=False)}\n\n"
-                except Exception as e:
-                    yield f"data: {json.dumps({'stage': 'npa_verify_error', 'message': f'Ошибка верификации НПА: {str(e)}'}, ensure_ascii=False)}\n\n"
-                    verified_npa_list = []
+            # Stage 1.5: Extract and verify NPA from user query (only for legal tasks)
+            if task_type in [TaskType.LEGAL_OPINION, TaskType.GENERAL, TaskType.DRAFT]:
+                npa_references = extract_npa_references_regex(user_query)
+                if npa_references:
+                    yield f"data: {json.dumps({'stage': 'npa_verify', 'message': f'Верификация {len(npa_references)} НПА...'}, ensure_ascii=False)}\n\n"
+                    try:
+                        verified_npa_list = await verify_npa_references(npa_references, max_concurrent=2)
+                        yield f"data: {json.dumps({'stage': 'npa_verify_complete', 'message': 'Верификация НПА завершена'}, ensure_ascii=False)}\n\n"
+                    except Exception as e:
+                        yield f"data: {json.dumps({'stage': 'npa_verify_error', 'message': f'Ошибка верификации НПА: {str(e)}'}, ensure_ascii=False)}\n\n"
+                        verified_npa_list = []
 
             # Stage 2: Generate response
             yield f"data: {json.dumps({'stage': 'generating', 'message': 'Генерация ответа...'}, ensure_ascii=False)}\n\n"
@@ -301,14 +191,15 @@ async def single_query(
                     npa_lines.append(line)
                 npa_info = "\n".join(npa_lines)
 
-            # Build system prompt
+            # Build system prompt based on task type
             if search_results or verified_npa_list:
-                system_prompt = LEGAL_SYSTEM_PROMPT_WITH_CASES.format(
+                system_prompt = get_prompt_with_cases(
+                    task_type=task_type,
                     verified_cases=search_results if search_results else "Судебная практика не запрашивалась.",
                     verified_npa=npa_info
                 )
             else:
-                system_prompt = LEGAL_SYSTEM_PROMPT
+                system_prompt = get_system_prompt(task_type)
 
             # Build messages for LLM
             messages = [{"role": "system", "content": system_prompt}]
@@ -356,7 +247,7 @@ async def single_query(
                 user_name=user_name,
                 invite_code=None,
                 model=model,
-                request_type=f"single_query_{request.mode.value}",
+                request_type=f"single_query_{request.mode.value}_{task_type.value}",
                 response_time_ms=elapsed_ms,
                 tokens_used=len(full_response.split()) if full_response else 0,
                 success=success,
