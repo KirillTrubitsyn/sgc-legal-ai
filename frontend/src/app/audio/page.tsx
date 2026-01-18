@@ -511,39 +511,50 @@ export default function AudioPage() {
               )}
 
               {/* Progress */}
-              {isTranscribing && progress && (
+              {isTranscribing && (
                 <div className="space-y-4">
                   <div className="bg-sgc-blue-700 rounded-lg p-4 space-y-3">
+                    {/* Stage indicator */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 border-2 border-sgc-orange border-t-transparent rounded-full animate-spin shrink-0" />
+                      <div>
+                        <p className="text-white font-medium">
+                          {progress?.stage === "preparing" && "Загрузка файла..."}
+                          {progress?.stage === "transcribing" && "Транскрибация..."}
+                          {progress?.stage === "complete" && "Завершено!"}
+                          {(!progress || !progress.stage) && "Подготовка..."}
+                        </p>
+                        {progress?.message && (
+                          <p className="text-gray-400 text-sm">{progress.message}</p>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Progress bar */}
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-300">{progress.message}</span>
-                        <span className="text-sgc-orange">
-                          {formatProgress(progress.progress)}
+                        <span className="text-gray-400">Прогресс</span>
+                        <span className="text-sgc-orange font-medium">
+                          {progress ? formatProgress(progress.progress) : "0%"}
                         </span>
                       </div>
-                      <div className="h-2 bg-sgc-blue-900 rounded-full overflow-hidden">
+                      <div className="h-3 bg-sgc-blue-900 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-sgc-orange transition-all duration-300"
-                          style={{ width: `${progress.progress * 100}%` }}
+                          className="h-full bg-gradient-to-r from-sgc-orange to-orange-400 transition-all duration-300"
+                          style={{ width: `${(progress?.progress || 0) * 100}%` }}
                         />
                       </div>
                     </div>
 
                     {/* Chunk info */}
-                    {progress.chunk_index && progress.total_chunks && (
-                      <p className="text-gray-400 text-xs text-center">
+                    {progress?.chunk_index && progress?.total_chunks && (
+                      <p className="text-gray-400 text-sm text-center">
                         Часть {progress.chunk_index} из {progress.total_chunks}
                       </p>
                     )}
                   </div>
 
-                  {/* Spinner */}
-                  <div className="flex justify-center">
-                    <div className="w-8 h-8 border-2 border-sgc-orange border-t-transparent rounded-full animate-spin" />
-                  </div>
-
-                  <p className="text-gray-400 text-xs text-center">
+                  <p className="text-gray-500 text-xs text-center">
                     Не закрывайте окно и не сворачивайте приложение
                   </p>
                 </div>
