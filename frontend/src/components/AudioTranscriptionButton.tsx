@@ -9,7 +9,7 @@ interface AudioTranscriptionButtonProps {
   disabled?: boolean;
 }
 
-const ACCEPTED_AUDIO_TYPES = ".mp3,.wav,.ogg,.m4a,.webm,.flac";
+const ACCEPTED_AUDIO_TYPES = ".mp3,.wav,.ogg,.m4a,.webm,.flac,.mp4,.aac";
 
 export default function AudioTranscriptionButton({
   token,
@@ -182,7 +182,7 @@ export default function AudioTranscriptionButton({
                       </svg>
                       <span>Выберите аудио файл</span>
                       <span className="text-xs text-gray-500">
-                        MP3, WAV, OGG, M4A, FLAC (до 500 МБ)
+                        MP3, WAV, OGG, M4A, MP4, FLAC (до 500 МБ)
                       </span>
                     </div>
                   </button>

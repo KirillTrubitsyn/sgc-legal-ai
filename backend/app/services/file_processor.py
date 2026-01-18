@@ -28,7 +28,7 @@ def detect_file_type(filename: str) -> str:
         return 'text'
     elif ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff']:
         return 'image'
-    elif ext in ['mp3', 'wav', 'ogg', 'm4a', 'webm']:
+    elif ext in ['mp3', 'wav', 'ogg', 'm4a', 'webm', 'mp4', 'flac', 'aac']:
         return 'audio'
     else:
         return 'unknown'
@@ -42,7 +42,10 @@ def get_audio_mime_type(filename: str) -> str:
         'wav': 'audio/wav',
         'ogg': 'audio/ogg',
         'm4a': 'audio/mp4',
-        'webm': 'audio/webm'
+        'mp4': 'audio/mp4',
+        'webm': 'audio/webm',
+        'flac': 'audio/flac',
+        'aac': 'audio/aac',
     }
     return mime_types.get(ext, 'audio/mpeg')
 
