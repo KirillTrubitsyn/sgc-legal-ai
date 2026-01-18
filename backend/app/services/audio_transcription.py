@@ -167,10 +167,22 @@ def split_audio_into_chunks(
         duration_seconds = len(audio) / 1000.0
         total_duration = len(audio)
 
+        # Supported formats by OpenRouter input_audio
+        supported_formats = {'mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'aiff'}
+
         # If audio is short enough, return as single chunk
         if total_duration <= CHUNK_DURATION_MS:
-            audio_base64 = base64.b64encode(audio_content).decode('utf-8')
-            return [(audio_base64, audio_format)], duration_seconds
+            # Convert to MP3 if format is not supported (e.g., webm)
+            if audio_format not in supported_formats:
+                chunk_path = tempfile.mktemp(suffix='.mp3')
+                audio.export(chunk_path, format='mp3', bitrate='128k')
+                with open(chunk_path, 'rb') as f:
+                    audio_base64 = base64.b64encode(f.read()).decode('utf-8')
+                os.unlink(chunk_path)
+                return [(audio_base64, 'mp3')], duration_seconds
+            else:
+                audio_base64 = base64.b64encode(audio_content).decode('utf-8')
+                return [(audio_base64, audio_format)], duration_seconds
 
         # Split into chunks
         chunks = []
