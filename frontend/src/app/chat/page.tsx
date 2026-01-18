@@ -21,7 +21,7 @@ import {
 } from "@/lib/api";
 import ChatHistorySidebar from "@/components/ChatHistorySidebar";
 import ModeSelector from "@/components/ModeSelector";
-import { History } from "lucide-react";
+import { History, Mic } from "lucide-react";
 import ModeToggle from "@/components/ModeToggle";
 import ChatMessage from "@/components/ChatMessage";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -596,14 +596,23 @@ export default function ChatPage() {
               </>
             )}
           </div>
-          {messages.length > 0 && (
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            {messages.length > 0 && (
+              <button
+                onClick={handleNewChat}
+                className="text-gray-400 hover:text-white text-sm whitespace-nowrap"
+              >
+                + Новый чат
+              </button>
+            )}
             <button
-              onClick={handleNewChat}
-              className="text-gray-400 hover:text-white text-sm whitespace-nowrap self-end sm:self-auto"
+              onClick={() => router.push("/audio")}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg text-sgc-orange text-sm transition-colors"
             >
-              + Новый чат
+              <Mic size={16} />
+              <span>Аудио</span>
             </button>
-          )}
+          </div>
         </div>
       </div>
 
