@@ -44,7 +44,7 @@ export default function ModeToggle({ mode, onModeChange, disabled }: Props) {
               mode === m.id ? "text-white" : "text-gray-400"
             }`}
           >
-            <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Icon className="hidden sm:block w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {m.name}
           </button>
         );

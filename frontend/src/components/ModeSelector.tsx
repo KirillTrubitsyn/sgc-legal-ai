@@ -25,7 +25,7 @@ export default function ModeSelector({ mode, onModeChange }: Props) {
           mode === "consilium" ? "text-white" : "text-gray-400"
         }`}
       >
-        <Users size={14} />
+        <Users size={14} className="hidden sm:block" />
         Консилиум
       </button>
       <button
@@ -34,7 +34,7 @@ export default function ModeSelector({ mode, onModeChange }: Props) {
           mode === "single" ? "text-white" : "text-gray-400"
         }`}
       >
-        <MessageSquare size={14} />
+        <MessageSquare size={14} className="hidden sm:block" />
         Запрос
       </button>
     </div>
