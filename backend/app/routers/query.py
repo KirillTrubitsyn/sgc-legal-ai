@@ -452,6 +452,7 @@ class ExportDocxRequest(BaseModel):
     question: str
     answer: str
     model: Optional[str] = None
+    title: Optional[str] = None  # Custom document title (overrides default)
 
 
 @router.post("/export/docx")
@@ -467,7 +468,8 @@ async def export_docx(
             question=request.question,
             answer=request.answer,
             model=request.model,
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            title=request.title
         )
 
         return Response(
