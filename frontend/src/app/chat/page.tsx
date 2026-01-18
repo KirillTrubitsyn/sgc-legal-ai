@@ -173,6 +173,22 @@ export default function ChatPage() {
     }
   }, [continuedFromSaved]);
 
+  // Handle transcription context from audio page
+  useEffect(() => {
+    const transcriptionContext = sessionStorage.getItem("transcription_context");
+    if (transcriptionContext && !isInitializing) {
+      // Set as file context for LLM
+      setUploadedFile({
+        success: true,
+        file_type: "transcription",
+        extracted_text: transcriptionContext,
+        summary: `Транскрипция аудио | ${transcriptionContext.split(" ").length} слов`,
+      });
+      // Clean up
+      sessionStorage.removeItem("transcription_context");
+    }
+  }, [isInitializing]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent, consiliumStage, singleQueryStage]);
@@ -532,6 +548,12 @@ export default function ChatPage() {
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <a
+              href="/audio"
+              className="text-gray-400 hover:text-sgc-orange text-xs sm:text-sm"
+            >
+              Аудио
+            </a>
             <a
               href="/saved"
               className="text-gray-400 hover:text-white text-xs sm:text-sm"
