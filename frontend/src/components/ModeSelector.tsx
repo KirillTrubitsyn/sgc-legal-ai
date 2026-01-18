@@ -25,7 +25,7 @@ export default function ModeSelector({ mode, onModeChange }: Props) {
           mode === "consilium" ? "text-white" : "text-gray-400"
         }`}
       >
-        <Users size={14} className="hidden sm:inline" />
+        <Users size={14} />
         Консилиум
       </button>
       <button
