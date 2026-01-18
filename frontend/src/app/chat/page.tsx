@@ -576,9 +576,9 @@ export default function ChatPage() {
       </header>
 
       {/* Mode & Query Mode Selector */}
-      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-3 sm:px-6 py-1.5 sm:py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-2 sm:px-6 py-1.5 sm:py-3 shrink-0">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <ModeSelector mode={mode} onModeChange={setMode} />
             {mode === "single" && (
               <ModeToggle
@@ -589,10 +589,10 @@ export default function ChatPage() {
             )}
             <button
               onClick={() => router.push("/audio")}
-              className="flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg text-sgc-orange text-xs sm:text-sm transition-colors"
+              className="flex items-center gap-1 px-1.5 py-1 sm:px-3 sm:py-1.5 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg text-sgc-orange text-xs sm:text-sm transition-colors"
             >
-              <Mic size={14} className="sm:w-4 sm:h-4" />
-              <span>Аудио</span>
+              <Mic size={14} />
+              <span className="hidden sm:inline">Аудио</span>
             </button>
           </div>
           {messages.length > 0 && (
