@@ -311,8 +311,7 @@ export default function AudioTranscriptionButton({
 
             {/* Footer */}
             <div className="p-4 border-t border-sgc-blue-500 text-xs text-gray-500">
-              Используется OpenAI Whisper для транскрибации на русском языке.
-              Стоимость: ~$0.006 за минуту аудио.
+              Используется Gemini 3.0 Flash для транскрибации на русском языке.
             </div>
           </div>
         </div>

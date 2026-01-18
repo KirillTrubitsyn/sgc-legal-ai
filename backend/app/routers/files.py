@@ -145,17 +145,10 @@ async def transcribe_audio_file(
 ):
     """
     Транскрибировать длинный аудио файл (до 2 часов).
-    Использует OpenAI Whisper API.
+    Использует Gemini 3.0 Flash через OpenRouter.
     Возвращает SSE stream с прогрессом транскрибации.
     """
     session = get_session_from_token(authorization)
-
-    # Check OpenAI API key
-    if not settings.openai_api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="Транскрибация недоступна: OpenAI API key не настроен"
-        )
 
     # Read file content
     content = await file.read()
@@ -224,16 +217,9 @@ async def transcribe_audio_simple_endpoint(
 ):
     """
     Транскрибировать аудио файл без стриминга прогресса.
-    Для коротких файлов или когда не нужен прогресс.
+    Использует Gemini 3.0 Flash через OpenRouter.
     """
     session = get_session_from_token(authorization)
-
-    # Check OpenAI API key
-    if not settings.openai_api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="Транскрибация недоступна: OpenAI API key не настроен"
-        )
 
     # Read file content
     content = await file.read()

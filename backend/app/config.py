@@ -12,9 +12,6 @@ class Settings(BaseSettings):
     # OpenRouter
     openrouter_api_key: str
 
-    # OpenAI API (for Whisper transcription)
-    openai_api_key: str = ""
-
     # Google Custom Search API
     google_api_key: str = ""
     google_cx: str = ""  # Search Engine ID
