@@ -93,6 +93,7 @@ export default function ChatPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wasLoadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -346,6 +347,10 @@ export default function ChatPage() {
       setCurrentChatSession({ ...currentChatSession, title: chatTitle });
     }
 
+    // Create AbortController for this request
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     if (mode === "single") {
       // Single Query mode с поиском Perplexity
       setStreamingContent("");
@@ -371,7 +376,8 @@ export default function ChatPage() {
             setSingleQueryMessage(update.message || "");
           },
           fileContext,
-          currentChatSession?.id
+          currentChatSession?.id,
+          signal
         );
 
         setSingleQueryStage("");
@@ -403,11 +409,16 @@ export default function ChatPage() {
         setSingleQueryStage("");
         setSingleQueryMessage("");
         setStreamingContent("");
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Ошибка: ${errorMessage}` },
-        ]);
+        // Don't show error message if request was cancelled
+        if (err instanceof Error && err.name === "AbortError") {
+          // Request was cancelled - do nothing
+        } else {
+          const errorMessage = err instanceof Error ? err.message : "Unknown error";
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `Ошибка: ${errorMessage}` },
+          ]);
+        }
       }
     } else {
       // Consilium mode - использует Perplexity + Google для поиска
@@ -447,22 +458,43 @@ export default function ChatPage() {
               ? update.message
               : (update.message ? JSON.stringify(update.message) : '');
             setConsiliumMessage(stageMsg);
-          }
+          },
+          signal
         );
 
         setMessages((prev) => [...prev, { type: "consilium", result }]);
         setConsiliumStage("");
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
         setConsiliumStage("");
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Ошибка консилиума: ${errorMessage}` },
-        ]);
+        // Don't show error message if request was cancelled
+        if (err instanceof Error && err.name === "AbortError") {
+          // Request was cancelled - do nothing
+        } else {
+          const errorMessage = err instanceof Error ? err.message : "Unknown error";
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `Ошибка консилиума: ${errorMessage}` },
+          ]);
+        }
       }
     }
 
     setIsLoading(false);
+    abortControllerRef.current = null;
+  };
+
+  // Cancel generation handler
+  const handleCancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+      setStreamingContent("");
+      setConsiliumStage("");
+      setConsiliumMessage("");
+      setSingleQueryStage("");
+      setSingleQueryMessage("");
+    }
   };
 
   const handleNewChat = async () => {
@@ -779,45 +811,58 @@ export default function ChatPage() {
             />
           )}
 
-          {/* Input with buttons like Perplexity */}
-          <ChatInput
-            onSend={handleSend}
-            disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
-            initialValue={voiceInputText || pendingText}
-            placeholder={
-              capturedPhotos.length > 0
-                ? "Вопрос по фото..."
-                : uploadedFile?.file_type === "transcription"
-                  ? "Вопрос по транскрипции..."
-                  : uploadedFile
-                    ? "Вопрос по файлу..."
-                    : "Спросите что угодно..."
-            }
-            bottomLeftContent={
-              <>
-                <FileButton
-                  token={token}
-                  onFileProcessed={handleFileProcessed}
-                  disabled={isLoading}
-                />
-                <AudioTranscriptionButton
-                  token={token}
-                  onTranscriptionComplete={handleTranscriptionComplete}
-                  disabled={isLoading}
-                />
-                <CameraButton
-                  onCapture={handlePhotoCapture}
-                  disabled={isLoading || capturedPhotos.some(p => p.isProcessing)}
-                  maxPhotos={MAX_PHOTOS}
-                  currentPhotoCount={chatPhotoCount + capturedPhotos.length}
-                />
-                <VoiceButton
-                  onTranscript={handleVoiceTranscript}
-                  disabled={isLoading}
-                />
-              </>
-            }
-          />
+          {/* Cancel button when loading */}
+          {isLoading ? (
+            <button
+              onClick={handleCancelGeneration}
+              className="w-full py-3 px-4 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              </svg>
+              Остановить генерацию
+            </button>
+          ) : (
+            /* Input with buttons like Perplexity */
+            <ChatInput
+              onSend={handleSend}
+              disabled={capturedPhotos.some(p => p.isProcessing)}
+              initialValue={voiceInputText || pendingText}
+              placeholder={
+                capturedPhotos.length > 0
+                  ? "Вопрос по фото..."
+                  : uploadedFile?.file_type === "transcription"
+                    ? "Вопрос по транскрипции..."
+                    : uploadedFile
+                      ? "Вопрос по файлу..."
+                      : "Спросите что угодно..."
+              }
+              bottomLeftContent={
+                <>
+                  <FileButton
+                    token={token}
+                    onFileProcessed={handleFileProcessed}
+                    disabled={false}
+                  />
+                  <AudioTranscriptionButton
+                    token={token}
+                    onTranscriptionComplete={handleTranscriptionComplete}
+                    disabled={false}
+                  />
+                  <CameraButton
+                    onCapture={handlePhotoCapture}
+                    disabled={capturedPhotos.some(p => p.isProcessing)}
+                    maxPhotos={MAX_PHOTOS}
+                    currentPhotoCount={chatPhotoCount + capturedPhotos.length}
+                  />
+                  <VoiceButton
+                    onTranscript={handleVoiceTranscript}
+                    disabled={false}
+                  />
+                </>
+              }
+            />
+          )}
           <div className="text-center mt-2 text-xs text-gray-500">
             Разработка @Кирилл Трубицын
           </div>

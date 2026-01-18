@@ -72,7 +72,8 @@ export async function sendQuery(
   onChunk: (chunk: string) => void,
   onStageUpdate?: (update: SingleQueryStageUpdate) => void,
   fileContext?: string,
-  chatSessionId?: string
+  chatSessionId?: string,
+  signal?: AbortSignal
 ): Promise<SingleQueryResult> {
   const res = await fetch(`${API_URL}/api/query/single`, {
     method: "POST",
@@ -87,6 +88,7 @@ export async function sendQuery(
       file_context: fileContext || null,
       chat_session_id: chatSessionId || null,
     }),
+    signal,
   });
 
   if (!res.ok) {
@@ -251,7 +253,8 @@ export interface StageUpdate {
 export async function runConsilium(
   token: string,
   question: string,
-  onStageUpdate: (update: StageUpdate) => void
+  onStageUpdate: (update: StageUpdate) => void,
+  signal?: AbortSignal
 ): Promise<ConsiliumResult> {
   const res = await fetch(`${API_URL}/api/consilium/stream`, {
     method: "POST",
@@ -260,6 +263,7 @@ export async function runConsilium(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ question }),
+    signal,
   });
 
   if (!res.ok) {
