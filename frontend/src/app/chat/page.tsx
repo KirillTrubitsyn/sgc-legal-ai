@@ -593,8 +593,8 @@ export default function ChatPage() {
       </header>
 
       {/* Mode & Query Mode Selector */}
-      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-2 sm:px-6 py-1.5 sm:py-3 shrink-0">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-1 sm:gap-2">
+      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-2 sm:px-6 py-1.5 sm:py-3 shrink-0 overflow-x-auto">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-1 sm:gap-2 min-w-max">
           <div className="flex items-center gap-1 sm:gap-2">
             <ModeSelector mode={mode} onModeChange={setMode} />
             {mode === "single" && (
