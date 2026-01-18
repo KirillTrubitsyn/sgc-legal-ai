@@ -606,10 +606,10 @@ export default function ChatPage() {
             )}
             <button
               onClick={() => router.push("/audio")}
-              className="flex items-center gap-1 px-1.5 py-1 sm:px-3 sm:py-1.5 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg text-sgc-orange text-xs sm:text-sm transition-colors"
+              className="flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 bg-sgc-orange/20 hover:bg-sgc-orange/30 border border-sgc-orange/50 rounded-lg text-sgc-orange text-xs sm:text-sm transition-colors"
             >
-              <Mic size={14} />
-              <span className="hidden sm:inline">Аудио</span>
+              <Mic size={14} className="hidden sm:block" />
+              Аудио
             </button>
           </div>
           {messages.length > 0 && (
