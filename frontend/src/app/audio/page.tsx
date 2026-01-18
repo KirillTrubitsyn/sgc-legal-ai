@@ -307,7 +307,7 @@ export default function AudioPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-sgc-blue-900">
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Header */}
@@ -347,8 +347,8 @@ export default function AudioPage() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-4 overflow-y-auto">
-          <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex-1 p-4 overflow-y-auto bg-sgc-blue-900">
+          <div className="max-w-4xl mx-auto space-y-4">
             {/* Upload Section */}
             <div className="bg-sgc-blue-800 rounded-xl p-6">
               <h2 className="text-white text-lg font-semibold mb-4">
