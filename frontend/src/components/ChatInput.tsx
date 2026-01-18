@@ -44,20 +44,22 @@ export default function ChatInput({
           onChange={(e) => setInput(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          rows={1}
+          rows={2}
           className="w-full bg-transparent text-white placeholder-gray-400 focus:outline-none
                      resize-none disabled:opacity-50 text-base"
-          style={{ minHeight: "1.5rem", maxHeight: "6rem" }}
+          style={{ minHeight: "3rem", maxHeight: "8rem" }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            // Shift+Enter = отправить сообщение
+            if (e.key === "Enter" && e.shiftKey) {
               e.preventDefault();
               handleSend();
             }
+            // Обычный Enter = новая строка (поведение по умолчанию)
           }}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement;
             target.style.height = "auto";
-            target.style.height = Math.min(target.scrollHeight, 96) + "px";
+            target.style.height = Math.min(target.scrollHeight, 128) + "px";
           }}
         />
       </div>
