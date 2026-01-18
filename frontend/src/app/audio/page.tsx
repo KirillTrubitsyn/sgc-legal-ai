@@ -323,16 +323,16 @@ export default function AudioPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-sgc-blue-900">
+    <div className="min-h-screen w-full bg-sgc-blue-900 overflow-x-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen w-full">
         {/* Header */}
-        <header className="bg-sgc-blue-800 border-b border-sgc-blue-500 px-4 py-3">
-          <div className="flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex items-center gap-3">
+        <header className="bg-sgc-blue-800 border-b border-sgc-blue-500 px-3 sm:px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => router.push("/chat")}
-                className="text-gray-400 hover:text-white p-2 hover:bg-sgc-blue-700 rounded-lg transition-colors"
+                className="text-gray-400 hover:text-white p-1.5 sm:p-2 hover:bg-sgc-blue-700 rounded-lg transition-colors"
                 title="Назад к чату"
               >
                 <ArrowLeft size={20} />
@@ -342,8 +342,8 @@ export default function AudioPage() {
                   <Mic size={18} className="text-sgc-orange" />
                 </div>
                 <div>
-                  <h1 className="text-white font-semibold">Аудио транскрипции</h1>
-                  <p className="text-gray-500 text-xs">Транскрибация записей</p>
+                  <h1 className="text-white font-semibold text-sm sm:text-base">Аудио транскрипции</h1>
+                  <p className="text-gray-500 text-xs hidden sm:block">Транскрибация записей</p>
                 </div>
               </div>
             </div>
@@ -363,8 +363,8 @@ export default function AudioPage() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-4 overflow-y-auto bg-sgc-blue-900">
-          <div className="max-w-4xl mx-auto space-y-4">
+        <div className="flex-1 px-3 sm:px-4 py-4 overflow-y-auto bg-sgc-blue-900">
+          <div className="w-full max-w-4xl mx-auto space-y-4">
             {/* Upload Section */}
             <div className="bg-sgc-blue-800 rounded-xl p-6">
               <h2 className="text-white text-lg font-semibold mb-4">
