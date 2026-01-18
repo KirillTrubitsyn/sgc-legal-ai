@@ -92,6 +92,7 @@ export default function ChatPage() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wasLoadingRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -189,9 +190,25 @@ export default function ChatPage() {
     }
   }, [isInitializing]);
 
+  // Scroll to end during streaming, scroll to response start when complete
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingContent, consiliumStage, singleQueryStage]);
+    // When loading finishes, scroll to start of the last response
+    if (wasLoadingRef.current && !isLoading) {
+      // Find the last assistant message and scroll to it
+      setTimeout(() => {
+        const assistantMessages = document.querySelectorAll('[data-role="assistant"]');
+        const lastAssistant = assistantMessages[assistantMessages.length - 1];
+        if (lastAssistant) {
+          lastAssistant.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+    // During streaming/loading, scroll to bottom to show progress
+    else if (isLoading || streamingContent || consiliumStage || singleQueryStage) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    wasLoadingRef.current = isLoading;
+  }, [messages, streamingContent, consiliumStage, singleQueryStage, isLoading]);
 
   const handleLogout = () => {
     localStorage.removeItem("sgc_token");
