@@ -50,8 +50,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="mt-12 text-gray-500 text-xs text-center">
-        <div>© 2025 СГК. Для внутреннего использования.</div>
-        <div className="mt-1">Разработка: Кирилл Трубицын</div>
+        <div>Разработка Кирилл Трубицын</div>
       </footer>
     </main>
   );
