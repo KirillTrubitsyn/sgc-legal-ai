@@ -16,14 +16,65 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'static', 'logo.png')
 
 
+def _generate_transcription_title(text: str) -> str:
+    """
+    Generate a title for transcription based on content.
+    Analyzes text to determine the type of recording.
+    """
+    text_lower = text.lower()[:2000]  # Check first 2000 chars
+
+    # Keywords for different types
+    court_keywords = ['суд', 'судь', 'истец', 'ответчик', 'заседани', 'иск', 'решени суда',
+                      'апелляци', 'кассаци', 'прокурор', 'адвокат', 'подсудим']
+    meeting_keywords = ['совещани', 'протокол', 'повестка', 'присутствовал', 'слушали',
+                        'постановили', 'решили', 'собрани']
+    negotiation_keywords = ['переговор', 'договорил', 'предложени', 'условия сделк',
+                           'контракт', 'соглашени']
+    interview_keywords = ['интервью', 'вопрос:', 'ответ:', 'корреспондент', 'журналист']
+    lecture_keywords = ['лекци', 'тема занятия', 'студент', 'преподаватель', 'семинар']
+
+    # Count keyword matches
+    court_score = sum(1 for kw in court_keywords if kw in text_lower)
+    meeting_score = sum(1 for kw in meeting_keywords if kw in text_lower)
+    negotiation_score = sum(1 for kw in negotiation_keywords if kw in text_lower)
+    interview_score = sum(1 for kw in interview_keywords if kw in text_lower)
+    lecture_score = sum(1 for kw in lecture_keywords if kw in text_lower)
+
+    scores = {
+        'ТРАНСКРИПЦИЯ СУДЕБНОГО ЗАСЕДАНИЯ': court_score,
+        'ПРОТОКОЛ СОВЕЩАНИЯ': meeting_score,
+        'ТРАНСКРИПЦИЯ ПЕРЕГОВОРОВ': negotiation_score,
+        'ТРАНСКРИПЦИЯ ИНТЕРВЬЮ': interview_score,
+        'ТРАНСКРИПЦИЯ ЛЕКЦИИ': lecture_score,
+    }
+
+    # Find the best match
+    best_title = max(scores, key=scores.get)
+    best_score = scores[best_title]
+
+    # If no clear match, use generic title
+    if best_score < 2:
+        return 'ТРАНСКРИПЦИЯ АУДИОЗАПИСИ'
+
+    return best_title
+
+
 def create_response_docx(
     question: str,
     answer: str,
     model: Optional[str] = None,
-    created_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None,
+    title: Optional[str] = None
 ) -> bytes:
     """
     Create a DOCX document in analytical brief style
+
+    Args:
+        question: The question that was asked
+        answer: The answer/content
+        model: Model ID used (or "transcription" for transcriptions)
+        created_at: Document creation date
+        title: Custom title (if None, will be "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ" or auto-generated for transcriptions)
     """
     doc = Document()
 
@@ -45,15 +96,24 @@ def create_response_docx(
         run.add_picture(LOGO_PATH, width=Inches(0.6))
         header_para.paragraph_format.space_after = Pt(4)
 
-    # Main title - "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ"
-    title = doc.add_paragraph()
-    title_run = title.add_run("ПРАВОВОЕ ЗАКЛЮЧЕНИЕ")
+    # Determine title
+    if title:
+        doc_title = title.upper()
+    elif model == "transcription":
+        # Auto-generate title from content for transcriptions
+        doc_title = _generate_transcription_title(answer)
+    else:
+        doc_title = "ПРАВОВОЕ ЗАКЛЮЧЕНИЕ"
+
+    # Main title
+    title_para = doc.add_paragraph()
+    title_run = title_para.add_run(doc_title)
     title_run.bold = True
     title_run.font.size = Pt(14)
     title_run.font.name = 'Times New Roman'
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.paragraph_format.space_after = Pt(8)
-    title.paragraph_format.space_before = Pt(0)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_para.paragraph_format.space_after = Pt(8)
+    title_para.paragraph_format.space_before = Pt(0)
 
     # Extract sources from text and clean answer
     clean_answer, sources = _extract_sources(answer)
