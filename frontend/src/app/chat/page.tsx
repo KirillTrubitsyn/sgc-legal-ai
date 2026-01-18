@@ -534,23 +534,30 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-[100dvh] flex overflow-hidden">
+    <div className="min-h-screen flex">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 h-full">
+      <div className="flex-1 flex flex-col min-w-0">
       {/* Header */}
-      <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-3 sm:px-6 py-2 sm:py-4 shrink-0">
+      <header className="bg-sgc-blue-700 border-b border-sgc-blue-500 px-3 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <img
               src="/sgc-logo-horizontal.png"
               alt="SGC Legal AI"
-              className="h-8 sm:h-[74px] shrink-0"
+              className="h-10 sm:h-[74px] shrink-0"
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <a
+              href="/audio"
+              className="text-gray-400 hover:text-sgc-orange text-xs sm:text-sm flex items-center gap-1"
+            >
+              <Mic size={16} className="sm:hidden" />
+              <span className="hidden sm:inline">Аудио</span>
+            </a>
+            <a
               href="/saved"
-              className="text-gray-400 hover:text-white text-xs sm:text-sm"
+              className="text-gray-400 hover:text-white text-xs sm:text-sm hidden sm:inline"
             >
               Сохранённые
             </a>
@@ -560,7 +567,7 @@ export default function ChatPage() {
               className="md:hidden text-gray-400 hover:text-sgc-orange p-1"
               title="История чатов"
             >
-              <History size={20} />
+              <History size={18} />
             </button>
             <span className="text-gray-400 text-sm hidden sm:inline">
               {userName}
@@ -576,7 +583,7 @@ export default function ChatPage() {
       </header>
 
       {/* Mode & Query Mode Selector */}
-      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-3 sm:px-6 py-1.5 sm:py-3 shrink-0">
+      <div className="bg-sgc-blue-700/50 border-b border-sgc-blue-500 px-3 sm:px-6 py-2 sm:py-3">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 flex-wrap">
             <ModeSelector mode={mode} onModeChange={setMode} />
@@ -611,11 +618,11 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-y-auto px-3 sm:px-6 py-3 sm:py-6 min-h-0">
+      <main className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
           {messages.length === 0 && !streamingContent && !consiliumStage && !singleQueryStage ? (
-            <div className="text-center text-gray-500 mt-8 sm:mt-20">
-              <p className="text-base sm:text-lg mb-2">
+            <div className="text-center text-gray-500 mt-20">
+              <p className="text-lg mb-2">
                 {mode === "single"
                   ? "Задайте юридический вопрос"
                   : "Режим Консилиум"}
@@ -745,7 +752,7 @@ export default function ChatPage() {
       </main>
 
       {/* Input Area */}
-      <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-2 sm:px-6 py-2 sm:py-4 shrink-0">
+      <div className="bg-sgc-blue-700/50 border-t border-sgc-blue-500 px-2 sm:px-6 py-2 sm:py-4">
         <div className="max-w-4xl mx-auto">
           {/* File preview */}
           {uploadedFile && (
@@ -805,6 +812,9 @@ export default function ChatPage() {
               </>
             }
           />
+          <div className="text-center mt-2 text-xs text-gray-500">
+            © Кирилл Трубицын
+          </div>
         </div>
       </div>
       </div> {/* End of main content */}

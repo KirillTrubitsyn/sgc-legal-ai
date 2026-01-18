@@ -39,6 +39,13 @@ export default function AudioPage() {
   const [progress, setProgress] = useState<TranscribeAndSaveProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -56,6 +63,18 @@ export default function AudioPage() {
     loadTranscriptions(storedToken);
     setIsInitializing(false);
   }, [router]);
+
+  // Cleanup recording timer on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    };
+  }, [mediaRecorder]);
 
   const loadTranscriptions = async (authToken: string) => {
     try {
@@ -198,6 +217,73 @@ export default function AudioPage() {
     downloadBlob(blob, `${filename}-${date}.txt`);
   };
 
+  // Recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      });
+
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+          setAudioChunks([...chunks]);
+        }
+      };
+
+      recorder.onstop = () => {
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        // Create file from chunks
+        const mimeType = recorder.mimeType || 'audio/webm';
+        const extension = mimeType.includes('webm') ? 'webm' : 'm4a';
+        const blob = new Blob(chunks, { type: mimeType });
+        const file = new File([blob], `recording-${Date.now()}.${extension}`, { type: mimeType });
+
+        setSelectedFile(file);
+        setAudioChunks([]);
+      };
+
+      recorder.start(1000); // Collect data every second
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      // Start timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      setError("Не удалось получить доступ к микрофону");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    setIsRecording(false);
+    setMediaRecorder(null);
+
+    // Clear timer
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const formatRecordingTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024 * 1024) {
       return `${(bytes / 1024).toFixed(1)} КБ`;
@@ -273,8 +359,59 @@ export default function AudioPage() {
                 переговоры, совещания, встречи. До 2 часов.
               </p>
 
-              {/* File Input */}
+              {/* Recording Section - Mobile */}
               {!isTranscribing && !selectedFile && (
+                <div className="mb-4">
+                  {!isRecording ? (
+                    <button
+                      onClick={startRecording}
+                      disabled={transcriptionsCount >= maxTranscriptions}
+                      className="w-full py-4 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                    >
+                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                        <Mic size={20} className="text-white" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-white font-medium block">Начать запись</span>
+                        <span className="text-gray-400 text-xs">Запишите аудио с микрофона</span>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />
+                          <span className="text-white font-medium">Идёт запись</span>
+                        </div>
+                        <span className="text-red-400 font-mono text-lg">
+                          {formatRecordingTime(recordingTime)}
+                        </span>
+                      </div>
+                      <button
+                        onClick={stopRecording}
+                        className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                        Остановить запись
+                      </button>
+                      <p className="text-gray-400 text-xs text-center mt-3">
+                        Нажмите для остановки и автоматической подготовки к транскрибации
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center my-4">
+                    <div className="flex-1 h-px bg-sgc-blue-600" />
+                    <span className="px-3 text-gray-500 text-sm">или</span>
+                    <div className="flex-1 h-px bg-sgc-blue-600" />
+                  </div>
+                </div>
+              )}
+
+              {/* File Input */}
+              {!isTranscribing && !selectedFile && !isRecording && (
                 <div className="space-y-3">
                   <input
                     ref={fileInputRef}
