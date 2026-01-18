@@ -63,31 +63,15 @@ def get_audio_format(filename: str) -> str:
     return format_map.get(ext, 'mp3')
 
 
-def get_mime_type(filename: str) -> str:
-    """Get MIME type for audio file"""
-    ext = filename.lower().split('.')[-1]
-    mime_map = {
-        'mp3': 'audio/mpeg',
-        'wav': 'audio/wav',
-        'ogg': 'audio/ogg',
-        'm4a': 'audio/mp4',
-        'mp4': 'audio/mp4',
-        'webm': 'audio/webm',
-        'flac': 'audio/flac',
-        'aac': 'audio/aac',
-    }
-    return mime_map.get(ext, 'audio/mpeg')
-
-
 async def transcribe_chunk_gemini(
     audio_base64: str,
-    mime_type: str,
+    audio_format: str,
     chunk_index: int = 0,
     total_chunks: int = 1
 ) -> str:
     """Transcribe a single audio chunk using Gemini via OpenRouter with retry logic"""
 
-    # Build multimodal message with audio
+    # Build multimodal message with audio using correct input_audio type
     messages = [
         {
             "role": "user",
@@ -102,9 +86,10 @@ async def transcribe_chunk_gemini(
 Если есть неразборчивые места, отмечай их как [неразборчиво]."""
                 },
                 {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{mime_type};base64,{audio_base64}"
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": audio_base64,
+                        "format": audio_format
                     }
                 }
             ]
@@ -168,10 +153,9 @@ def split_audio_into_chunks(
 ) -> Tuple[list[Tuple[str, str]], float]:
     """
     Split audio file into chunks suitable for Gemini API.
-    Returns list of (base64_data, mime_type) tuples and total duration in seconds.
+    Returns list of (base64_data, audio_format) tuples and total duration in seconds.
     """
     audio_format = get_audio_format(filename)
-    mime_type = get_mime_type(filename)
 
     with tempfile.NamedTemporaryFile(suffix=f'.{audio_format}', delete=False) as tmp:
         tmp.write(audio_content)
@@ -186,7 +170,7 @@ def split_audio_into_chunks(
         # If audio is short enough, return as single chunk
         if total_duration <= CHUNK_DURATION_MS:
             audio_base64 = base64.b64encode(audio_content).decode('utf-8')
-            return [(audio_base64, mime_type)], duration_seconds
+            return [(audio_base64, audio_format)], duration_seconds
 
         # Split into chunks
         chunks = []
@@ -202,7 +186,7 @@ def split_audio_into_chunks(
             with open(chunk_path, 'rb') as f:
                 chunk_base64 = base64.b64encode(f.read()).decode('utf-8')
 
-            chunks.append((chunk_base64, 'audio/mpeg'))
+            chunks.append((chunk_base64, 'mp3'))
 
             # Clean up chunk file
             os.unlink(chunk_path)
@@ -244,7 +228,7 @@ async def transcribe_long_audio(
         # Transcribe each chunk
         transcripts = []
 
-        for i, (chunk_base64, mime_type) in enumerate(chunks):
+        for i, (chunk_base64, audio_format) in enumerate(chunks):
             progress = 0.05 + (0.9 * (i / total_chunks))
 
             yield TranscriptionProgress(
@@ -258,7 +242,7 @@ async def transcribe_long_audio(
 
             try:
                 chunk_text = await transcribe_chunk_gemini(
-                    chunk_base64, mime_type, i, total_chunks
+                    chunk_base64, audio_format, i, total_chunks
                 )
                 transcripts.append(chunk_text.strip())
             except Exception as e:
@@ -301,9 +285,9 @@ async def transcribe_audio_simple(
         total_chunks = len(chunks)
 
         transcripts = []
-        for i, (chunk_base64, mime_type) in enumerate(chunks):
+        for i, (chunk_base64, audio_format) in enumerate(chunks):
             chunk_text = await transcribe_chunk_gemini(
-                chunk_base64, mime_type, i, total_chunks
+                chunk_base64, audio_format, i, total_chunks
             )
             transcripts.append(chunk_text.strip())
 
