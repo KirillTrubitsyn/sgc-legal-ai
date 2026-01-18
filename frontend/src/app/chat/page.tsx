@@ -549,12 +549,6 @@ export default function ChatPage() {
           </div>
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <a
-              href="/audio"
-              className="text-gray-400 hover:text-sgc-orange text-xs sm:text-sm"
-            >
-              Аудио
-            </a>
-            <a
               href="/saved"
               className="text-gray-400 hover:text-white text-xs sm:text-sm"
             >
