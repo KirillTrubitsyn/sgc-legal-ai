@@ -550,13 +550,14 @@ export default function ChatPage() {
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <a
               href="/audio"
-              className="text-gray-400 hover:text-sgc-orange text-xs sm:text-sm"
+              className="text-gray-400 hover:text-sgc-orange text-xs sm:text-sm flex items-center gap-1"
             >
-              Аудио
+              <Mic size={16} className="sm:hidden" />
+              <span className="hidden sm:inline">Аудио</span>
             </a>
             <a
               href="/saved"
-              className="text-gray-400 hover:text-white text-xs sm:text-sm"
+              className="text-gray-400 hover:text-white text-xs sm:text-sm hidden sm:inline"
             >
               Сохранённые
             </a>
@@ -566,7 +567,7 @@ export default function ChatPage() {
               className="md:hidden text-gray-400 hover:text-sgc-orange p-1"
               title="История чатов"
             >
-              <History size={20} />
+              <History size={18} />
             </button>
             <span className="text-gray-400 text-sm hidden sm:inline">
               {userName}
