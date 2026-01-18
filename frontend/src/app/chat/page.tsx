@@ -561,7 +561,7 @@ export default function ChatPage() {
             <img
               src="/sgc-logo-horizontal.png"
               alt="SGC Legal AI"
-              className="h-16 sm:h-[74px] shrink-0"
+              className="h-20 sm:h-[74px] shrink-0"
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
