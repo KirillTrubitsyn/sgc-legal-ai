@@ -802,7 +802,7 @@ export default function ChatPage() {
             }
           />
           <div className="text-center mt-2 text-xs text-gray-500">
-            © Кирилл Трубицын
+            Разработка Кирилл Трубицын
           </div>
         </div>
       </div>
