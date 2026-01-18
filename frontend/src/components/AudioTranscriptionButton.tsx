@@ -96,7 +96,7 @@ export default function AudioTranscriptionButton({
         disabled={disabled}
         type="button"
         className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-sgc-blue-500 transition-colors disabled:opacity-50"
-        title="Транскрибация аудио (судебные записи)"
+        title="Транскрибация аудио"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -148,8 +148,8 @@ export default function AudioTranscriptionButton({
             <div className="p-4 space-y-4">
               {/* Description */}
               <p className="text-gray-300 text-sm">
-                Загрузите аудиозапись судебного заседания или другую запись для
-                транскрибации. Поддерживаются файлы до 2 часов.
+                Загрузите аудиозапись для транскрибации: судебные заседания,
+                переговоры, совещания, встречи. До 2 часов.
               </p>
 
               {/* File Input */}

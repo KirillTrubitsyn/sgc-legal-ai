@@ -802,6 +802,7 @@ export default function ChatPage() {
           result={transcriptionResult}
           onUseInChat={handleUseTranscriptionInChat}
           onClose={() => setTranscriptionResult(null)}
+          token={token}
         />
       )}
     </div>
